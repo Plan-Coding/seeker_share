@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a0f">
+    <meta name="description" content="Seeker Share 局域网文件与消息共享">
+    <title th:text="${applicationName}">Seeker Share</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+    <script th:src="@{/js/app.js}" src="/js/app.js" defer></script>
+</head>
+<body>
+<div id="bootScreen" class="boot-screen" aria-hidden="true">
+    <div class="boot-core"><span>S</span><i></i><b></b></div>
+    <p>SEEKER PROTOCOL</p>
+    <small><i></i> INITIALIZING LOCAL NODE</small>
+</div>
+<canvas id="particleCanvas" aria-hidden="true"></canvas>
+<div class="ambient ambient-one" aria-hidden="true"></div>
+<div class="ambient ambient-two" aria-hidden="true"></div>
+<div class="grid-overlay" aria-hidden="true"></div>
+<div class="scan-beam" aria-hidden="true"></div>
+<div id="cursorGlow" class="cursor-glow" aria-hidden="true"></div>
+
+<main class="shell">
+    <header class="topbar glass">
+        <a class="brand" href="/" aria-label="Seeker Share 首页">
+            <span class="brand-mark">S</span>
+            <span><strong th:text="${applicationName}">Seeker Share</strong><small>LOCAL TRANSMISSION NODE</small></span>
+        </a>
+        <div class="telemetry" aria-hidden="true"><span>UPLINK / <b>LOCAL</b></span><span id="systemClock">00:00:00</span></div>
+        <div class="connection"><span id="connectionDot"></span><strong id="connectionText">正在连接</strong><small>REALTIME SSE</small></div>
+    </header>
+
+    <section class="hero">
+        <div class="hero-copy">
+            <span class="kicker"><i></i> PRIVATE · FAST · DATABASE FREE</span>
+            <h1><span data-text="让文件穿过">让文件穿过</span><br><em data-text="局域网。">局域网。</em></h1>
+            <p>消息、代码和文件在你的设备之间即时流动。没有云端，没有账号，数据只停留在这台主机。</p>
+        </div>
+        <aside class="node-card glass">
+            <div class="node-radar"><span></span><i></i><b></b></div>
+            <small>ACTIVE NODE</small>
+            <strong id="hostName">SEEKER-NODE</strong>
+            <button id="copyAddress" class="address" type="button"><span id="networkAddress">正在检测局域网地址…</span><i>复制</i></button>
+        </aside>
+    </section>
+
+    <section class="metrics" aria-label="共享状态">
+        <article class="metric glass"><span>共享项目</span><strong id="itemMetric">00</strong><small>ITEMS ONLINE</small></article>
+        <article class="metric glass"><span>共享文件</span><strong id="fileMetric">00</strong><small>FILES READY</small></article>
+        <article class="metric storage-metric glass">
+            <span>存储空间</span><strong id="storageMetric">0 B</strong><small id="storageLimit">OF 1 GB</small>
+            <div class="storage-track"><i id="storageBar"></i></div>
+        </article>
+    </section>
+
+    <div class="signal-ticker" aria-hidden="true">
+        <div><span>ENCRYPTED LOCAL CHANNEL</span><i>◆</i><span>ZERO CLOUD RELAY</span><i>◆</i><span>REALTIME SIGNAL SYNC</span><i>◆</i><span>24H AUTO PURGE</span><i>◆</i><span>ENCRYPTED LOCAL CHANNEL</span><i>◆</i><span>ZERO CLOUD RELAY</span></div>
+    </div>
+
+    <section class="workspace">
+        <section class="transmit glass" aria-labelledby="transmitTitle">
+            <div class="panel-head"><div><span class="index">01</span><h2 id="transmitTitle">发射内容</h2></div><span class="live-chip">LIVE</span></div>
+            <form id="messageForm">
+                <label for="messageInput">快速消息</label>
+                <div class="message-box">
+                    <textarea id="messageInput" maxlength="5000" rows="6" placeholder="粘贴文字、链接、代码片段…" required></textarea>
+                    <div class="message-footer"><span id="characterCount">0 / 5000</span><span>⌘ + Enter 发送</span></div>
+                </div>
+                <button class="beam-button" type="submit"><span>发送到局域网</span><i>↗</i></button>
+            </form>
+
+            <div class="or"><span>FILE TRANSMISSION</span></div>
+
+            <form id="fileForm">
+                <label id="dropZone" class="drop-zone" for="fileInput">
+                    <input id="fileInput" name="file" type="file" multiple>
+                    <span class="upload-orbit"><i>↑</i></span>
+                    <strong>拖拽文件到这里</strong>
+                    <small>或点击选择多个文件 · 单文件最大 100MB</small>
+                </label>
+                <div id="uploadQueue" class="upload-queue"></div>
+            </form>
+        </section>
+
+        <section class="stream glass" aria-labelledby="streamTitle">
+            <div class="panel-head stream-head">
+                <div><span class="index">02</span><h2 id="streamTitle">实时数据流</h2><span id="itemCount" class="counter">0</span></div>
+                <button id="clearButton" class="clear-button" type="button">清空全部</button>
+            </div>
+            <div class="stream-tools">
+                <label><span>⌕</span><input id="searchInput" type="search" placeholder="搜索消息或文件"></label>
+                <select id="typeFilter" aria-label="类型筛选"><option value="ALL">全部类型</option><option value="MESSAGE">消息</option><option value="FILE">文件</option></select>
+            </div>
+            <div id="shareList" class="share-list" aria-live="polite"></div>
+            <div id="emptyState" class="empty-state">
+                <div class="empty-signal"><span></span><i></i><b>↗</b></div>
+                <h3>等待第一个信号</h3><p>从左侧发射一条消息或一个文件。</p>
+            </div>
+        </section>
+    </section>
+
+    <footer><span>SEEKER SHARE / LOCAL ONLY</span><span>内容将在 <strong>24 小时</strong>后自动销毁</span></footer>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"><i></i><span></span></div>
+</body>
+</html>
