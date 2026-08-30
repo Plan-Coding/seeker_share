@@ -49,7 +49,7 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 - 支持嵌入图片与附件（本地目录存储），可插入 Markdown 链接
 - 导出 Markdown / HTML / PDF（浏览器打印）
 - 复用 RBAC 权限：`DOCUMENT_READ / WRITE / MANAGE`，管理员与成员角色已内置
-- 前端库（Yjs、markdown-it、highlight.js）**自托管**于 `static/vendor/`，局域网运行不依赖外网 / CDN
+- 前端库（Yjs、markdown-it、highlight.js）与字体（Inter Variable）**自托管**于 `static/vendor/`，局域网运行不依赖外网 / CDN
 
 ### 运维工具箱
 
@@ -178,7 +178,7 @@ src/main/resources/
 ├── static/
 │   ├── css/      # app.css 共享界面 · tools.css 工具箱/文档库界面
 │   ├── js/       # app.js 共享逻辑 · tools.js 工具箱 · docs.js 文档库 · hanzi-data.js 汉字数据
-│   └── vendor/   # 自托管第三方前端库（yjs + lib0 / markdown-it / highlight.js）
+│   └── vendor/   # 自托管第三方前端库（yjs + lib0 / markdown-it / highlight.js / Inter Variable 字体）
 └── templates/    # Thymeleaf 页面模板
 AGENTS.md         # AI 代理项目指令（约定、命令、质量门槛）
 .agents/skills/   # Agent Skills 技能目录（分层组织，见其 README）
