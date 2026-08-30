@@ -147,6 +147,32 @@ select.tool-input { cursor: pointer; }
 .gen-list { display: grid; gap: .4rem; }
 .gen-item { display: flex; align-items: center; justify-content: space-between; gap: .8rem; padding: .55rem .8rem; border: 1px solid var(--line); background: rgba(0,0,0,.22); font: .76rem/1.4 ui-monospace, monospace; color: #dfe7ec; overflow-wrap: anywhere; animation: arrive .3s ease both; }
 
+/* --- 字帖生成器 --- */
+.ziti-preview { display: grid; gap: 1rem; max-width: 100%; overflow-x: auto; }
+.ziti-page { display: grid; gap: .35rem; justify-self: center; padding: .9rem; border: 1px solid var(--line); background: #fbf9f3; color: #222; }
+.ziti-title { padding-left: .7em; text-align: center; color: #6b665c; font: 700 .95rem/1.7 'Kaiti SC','KaiTi','STKaiti','Noto Serif SC','PingFang SC',serif; letter-spacing: .55em; }
+.ziti-grid { display: grid; grid-template-columns: repeat(var(--cols, 7), var(--cell, 56px)); grid-auto-rows: var(--cell, 56px); justify-content: center; }
+.ziti-cell { position: relative; width: var(--cell, 56px); height: var(--cell, 56px); box-sizing: border-box; display: grid; place-items: center; overflow: hidden; border: 1px solid #b8b1a3; }
+.ziti-cell.trace .ziti-char { color: #e8b6b6; }
+.ziti-tian::before, .ziti-mi::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; border-left: 1px dashed rgba(120,115,105,.5); }
+.ziti-tian::after, .ziti-mi::after { content: ""; position: absolute; top: 50%; left: 0; right: 0; border-top: 1px dashed rgba(120,115,105,.5); }
+.ziti-mi { background-image: linear-gradient(to bottom right, transparent calc(50% - .5px), rgba(120,115,105,.5) calc(50% - .5px), rgba(120,115,105,.5) calc(50% + .5px), transparent calc(50% + .5px)), linear-gradient(to top right, transparent calc(50% - .5px), rgba(120,115,105,.5) calc(50% - .5px), rgba(120,115,105,.5) calc(50% + .5px), transparent calc(50% + .5px)); }
+.ziti-char { position: relative; z-index: 1; font: 500 calc(var(--cell, 56px) * .68)/1 'Kaiti SC','KaiTi','STKaiti','Noto Serif SC','PingFang SC',serif; color: #1c1c1c; }
+.ziti-py { position: absolute; top: 3%; left: 0; right: 0; z-index: 2; text-align: center; color: #6b665c; font: 400 calc(var(--cell, 56px) * .22)/1 'Kaiti SC','PingFang SC','Microsoft YaHei',sans-serif; }
+.ziti-sc { position: absolute; right: 5%; bottom: 1%; z-index: 2; color: #a29b8d; font: 400 calc(var(--cell, 56px) * .2)/1 ui-monospace, monospace; }
+
+@media print {
+    @page { margin: 12mm; }
+    body { background: #fff !important; }
+    body * { visibility: hidden; }
+    .ziti-preview, .ziti-preview * { visibility: visible; }
+    .ziti-preview { position: absolute; left: 0; top: 0; width: 100%; gap: 0; overflow: visible; }
+    .ziti-page { break-after: page; justify-self: start; border: none; padding: 0; background: #fff; color: #000; }
+    .ziti-page:last-child { break-after: auto; }
+    .ziti-page, .ziti-cell, .ziti-char, .ziti-py, .ziti-sc { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .ziti-title { color: #444; }
+}
+
 /* --- 响应式 --- */
 @media (max-width: 980px) {
     .tools-layout { grid-template-columns: 1fr; }

@@ -435,6 +435,35 @@ function parseInBase(text, base) {
 /* ---- 假文生成 ---- */
 const LOREM_WORDS = ("lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat duis aute irure in reprehenderit voluptate velit esse cillum eu fugiat nulla pariatur excepteur sint occaecat cupidatat non proident sunt culpa qui officia deserunt mollit anim id est laborum").split(" ");
 
+/* ---- 汉字数据访问（数据来自 hanzi-data.js） ---- */
+const HANZI_ALPH = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const hanziDecode = (code) => HANZI_ALPH.indexOf(code[0]) * 62 + HANZI_ALPH.indexOf(code[1]);
+
+function hanziLookup(ch) {
+    const i = HANZI_CHARS.indexOf(ch);
+    if (i < 0) return null;
+    const primary = HANZI_SYLLABLES[hanziDecode(HANZI_PY.substr(i * 2, 2))];
+    const extras = (HANZI_EXTRA[ch] || "").split("|").filter(Boolean).map(c => HANZI_SYLLABLES[hanziDecode(c)]);
+    return {char: ch, pinyin: [primary, ...extras], strokes: HANZI_STROKES.charCodeAt(i) - 0x30};
+}
+
+/* ---- 拼音声调处理 ---- */
+const TONE_CHARS = {"ā":["a",1],"á":["a",2],"ǎ":["a",3],"à":["a",4],"ē":["e",1],"é":["e",2],"ě":["e",3],"è":["e",4],"ī":["i",1],"í":["i",2],"ǐ":["i",3],"ì":["i",4],"ō":["o",1],"ó":["o",2],"ǒ":["o",3],"ò":["o",4],"ū":["u",1],"ú":["u",2],"ǔ":["u",3],"ù":["u",4],"ǖ":["ü",1],"ǘ":["ü",2],"ǚ":["ü",3],"ǜ":["ü",4],"ń":["n",2],"ň":["n",3],"ǹ":["n",4],"ḿ":["m",2]};
+function splitSyllable(syl) {
+    for (const ch of syl) {
+        const t = TONE_CHARS[ch];
+        if (t) return {base: syl.replace(ch, t[0]), tone: t[1]};
+    }
+    return {base: syl, tone: 5};
+}
+function formatPinyin(syl, style) {
+    const {base, tone} = splitSyllable(syl);
+    if (style === "num") return base + (tone === 5 ? "" : tone);
+    if (style === "plain") return base;
+    return syl;
+}
+const capFirst = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
 /* ================= 工具注册表 ================= */
 const CATEGORIES = [
     {id: "text", name: "文本处理"},
@@ -442,6 +471,7 @@ const CATEGORIES = [
     {id: "crypto", name: "安全加密"},
     {id: "parse", name: "解析校验"},
     {id: "net", name: "网络运维"},
+    {id: "learn", name: "学习工具"},
     {id: "misc", name: "实用杂项"}
 ];
 
@@ -600,6 +630,25 @@ const TOOLS = [
             body.append(field("输入内容", src),
                 el("div", {class: "tool-actions"}, selector, copyBtn(() => out.value)),
                 field("转换结果", out));
+        }
+    },
+    {
+        id: "width", cat: "text", icon: "◧", name: "全角/半角转换",
+        desc: "中文全角与英文半角字符互转，含标点符号",
+        render(body) {
+            const src = area("Ｈｅｌｌｏ，世界！你好 123 ＡＢＣ。", 5);
+            const out = area("", 5);
+            out.readOnly = true;
+            const toHalf = (s) => s.replace(/[\uFF01-\uFF5E]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0)).replace(/\u3000/g, " ");
+            const toFull = (s) => s.replace(/[\u0021-\u007E]/g, c => String.fromCharCode(c.charCodeAt(0) + 0xFEE0)).replace(/ /g, "\u3000");
+            const run = (fn, label, toast = true) => { out.value = fn(src.value); if (toast) showToast(label + "完成"); };
+            body.append(field("输入文本", src),
+                el("div", {class: "tool-actions"},
+                    btn("全角 → 半角", () => run(toHalf, "全角转半角"), true),
+                    btn("半角 → 全角", () => run(toFull, "半角转全角")),
+                    copyBtn(() => out.value)),
+                field("输出结果", out));
+            run(toHalf, "", false);
         }
     },
 
@@ -1225,6 +1274,226 @@ const TOOLS = [
                 btn("生成", generate, true), copyBtn(() => out.value)),
                 field("输出结果", out));
             generate();
+        }
+    },
+
+    /* ---------- 学习工具 ---------- */
+    {
+        id: "ziti", cat: "learn", icon: "字", name: "字帖生成器",
+        desc: "生成田字格 / 米字格练字字帖，支持描红、拼音与笔画标注",
+        render(body) {
+            const src = area("床前明月光，疑是地上霜。\n举头望明月，低头思故乡。", 4);
+            const grid = el("select", {class: "tool-input sm"},
+                el("option", {value: "tian", text: "田字格"}),
+                el("option", {value: "mi", text: "米字格"}),
+                el("option", {value: "square", text: "方格"}));
+            const trace = checkbox("描红（浅色临摹）");
+            const showPy = checkbox("标注拼音", false);
+            const showSc = checkbox("标注笔画", false);
+            const cols = input({type: "number", value: "7", min: "1", max: "20", class: "tool-input sm"});
+            const rows = input({type: "number", value: "5", min: "1", max: "20", class: "tool-input sm"});
+            const size = input({type: "number", value: "56", min: "24", max: "160", class: "tool-input sm"});
+            const preview = el("div", {class: "ziti-preview"});
+            const count = note("");
+
+            const buildPages = () => {
+                const text = src.value.replace(/\r/g, "");
+                const cellPx = Math.max(24, Math.min(160, Number(size.value) || 56));
+                const perRow = Math.max(1, Math.min(20, Number(cols.value) || 7));
+                const perCol = Math.max(1, Math.min(20, Number(rows.value) || 5));
+                const pages = [];
+                let current = [], row = [];
+                const flushRow = () => { if (row.length) { current.push(row); row = []; } };
+                const flushPage = () => { if (current.length) { pages.push(current); current = []; } };
+                for (const ch of text) {
+                    if (ch === "\n") { flushRow(); if (current.length >= perCol) flushPage(); continue; }
+                    if (ch === " ") { row.push(null); }
+                    else {
+                        const info = hanziLookup(ch);
+                        row.push(info ? {char: ch, pinyin: info.pinyin, strokes: info.strokes} : {char: ch, pinyin: null, strokes: null});
+                    }
+                    if (row.length >= perRow) flushRow();
+                    if (current.length >= perCol) flushPage();
+                }
+                flushRow();
+                flushPage();
+                if (!pages.length) pages.push([]);
+                return {pages, cellPx, perRow, perCol};
+            };
+
+            const render = () => {
+                const {pages, cellPx, perRow} = buildPages();
+                const gridType = grid.value;
+                const traceMode = trace.box.checked;
+                const withPy = showPy.box.checked;
+                const withSc = showSc.box.checked;
+                let charTotal = 0, pyTotal = 0;
+                preview.replaceChildren(...pages.map(page => {
+                    const sheet = el("div", {class: "ziti-page", style: `--cell: ${cellPx}px; --cols: ${perRow}`});
+                    sheet.append(el("div", {class: "ziti-title", text: "练 字 帖"}));
+                    const gridEl = el("div", {class: "ziti-grid"});
+                    for (const row of page) {
+                        for (const cell of row) {
+                            if (cell === null) { gridEl.append(el("div", {class: `ziti-cell ziti-${gridType} ziti-empty`})); continue; }
+                            charTotal++;
+                            const node = el("div", {class: `ziti-cell ziti-${gridType}${traceMode ? " trace" : ""}`});
+                            if (withPy && cell.pinyin) { pyTotal++; node.append(el("span", {class: "ziti-py", text: cell.pinyin[0]})); }
+                            node.append(el("span", {class: "ziti-char", text: cell.char}));
+                            if (withSc && cell.strokes) node.append(el("span", {class: "ziti-sc", text: cell.strokes}));
+                            gridEl.append(node);
+                        }
+                    }
+                    sheet.append(gridEl);
+                    return sheet;
+                }));
+                count.textContent = `共 ${pages.length} 页 · ${charTotal} 字${withPy ? ` · 标注拼音 ${pyTotal} 字` : ""}`;
+                count.className = "tool-note ok";
+            };
+
+            const exportPng = () => {
+                const {pages, cellPx, perRow, perCol} = buildPages();
+                const gridType = grid.value, traceMode = trace.box.checked, withPy = showPy.box.checked, withSc = showSc.box.checked;
+                const pad = 28, titleH = 46, pageGap = 32;
+                const pageW = perRow * cellPx, pageH = perCol * cellPx;
+                const width = pageW + pad * 2;
+                const height = pages.length * (pageH + titleH) + pad * 2 + (pages.length - 1) * pageGap;
+                const canvas = document.createElement("canvas");
+                canvas.width = width * 2;
+                canvas.height = height * 2;
+                const ctx = canvas.getContext("2d");
+                ctx.scale(2, 2);
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(0, 0, width, height);
+                const fontStack = "'Kaiti SC','KaiTi','STKaiti','Noto Serif SC','PingFang SC',serif";
+                pages.forEach((page, p) => {
+                    const top = pad + p * (pageH + titleH + pageGap);
+                    ctx.strokeStyle = "#9a948a";
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeRect(pad - 8, top - 8, pageW + 16, pageH + titleH + 16);
+                    ctx.fillStyle = "#555";
+                    ctx.font = `600 ${Math.round(titleH * 0.55)}px ${fontStack}`;
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText("练 字 帖", width / 2, top + titleH / 2);
+                    page.forEach((row, r) => {
+                        row.forEach((cell, c) => {
+                            const x = pad + c * cellPx, y = top + titleH + r * cellPx;
+                            ctx.strokeStyle = "#8a8478";
+                            ctx.lineWidth = 1;
+                            ctx.strokeRect(x + .5, y + .5, cellPx - 1, cellPx - 1);
+                            if (gridType !== "square") {
+                                ctx.strokeStyle = "rgba(120,115,105,.55)";
+                                ctx.lineWidth = 1;
+                                ctx.setLineDash([4, 4]);
+                                ctx.beginPath();
+                                ctx.moveTo(x + cellPx / 2, y + 2); ctx.lineTo(x + cellPx / 2, y + cellPx - 2);
+                                ctx.moveTo(x + 2, y + cellPx / 2); ctx.lineTo(x + cellPx - 2, y + cellPx / 2);
+                                if (gridType === "mi") {
+                                    ctx.moveTo(x + 2, y + 2); ctx.lineTo(x + cellPx - 2, y + cellPx - 2);
+                                    ctx.moveTo(x + cellPx - 2, y + 2); ctx.lineTo(x + 2, y + cellPx - 2);
+                                }
+                                ctx.stroke();
+                                ctx.setLineDash([]);
+                            }
+                            if (!cell) return;
+                            if (withPy && cell.pinyin) {
+                                ctx.fillStyle = "#777";
+                                ctx.font = `${Math.round(cellPx * 0.24)}px ${fontStack}`;
+                                ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                                ctx.fillText(cell.pinyin[0], x + cellPx / 2, y + cellPx * 0.24);
+                            }
+                            ctx.fillStyle = traceMode ? "#e8b6b6" : "#1a1a1a";
+                            ctx.font = `${Math.round(cellPx * 0.66)}px ${fontStack}`;
+                            ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                            ctx.fillText(cell.char, x + cellPx / 2, y + cellPx * 0.55);
+                            if (withSc && cell.strokes) {
+                                ctx.fillStyle = "#9a948a";
+                                ctx.font = `${Math.round(cellPx * 0.2)}px ${fontStack}`;
+                                ctx.fillText(String(cell.strokes), x + cellPx * 0.8, y + cellPx * 0.16);
+                            }
+                        });
+                    });
+                });
+                const link = el("a", {href: canvas.toDataURL("image/png"), download: "字帖.png"});
+                document.body.append(link);
+                link.click();
+                link.remove();
+                showToast("已导出字帖 PNG");
+            };
+
+            src.addEventListener("input", render);
+            grid.addEventListener("change", render);
+            [cols, rows, size].forEach(n => n.addEventListener("input", render));
+            trace.box.addEventListener("change", render);
+            showPy.box.addEventListener("change", render);
+            showSc.box.addEventListener("change", render);
+            render();
+
+            body.append(
+                field("练习文本", src),
+                el("div", {class: "tool-actions"},
+                    el("div", {}, field("格子类型", grid)),
+                    el("div", {}, field("每行字数", cols)),
+                    el("div", {}, field("每页行数", rows)),
+                    el("div", {}, field("格子大小 px", size))),
+                el("div", {class: "tool-actions"}, trace.node, showPy.node, showSc.node,
+                    btn("打印字帖", () => window.print(), true),
+                    btn("下载 PNG", exportPng)),
+                count,
+                field("字帖预览（打印请用浏览器的打印功能）", preview));
+        }
+    },
+    {
+        id: "pinyin", cat: "learn", icon: "拼", name: "汉字注音",
+        desc: "为汉字批量标注拼音，支持声调样式、大小写与多音字",
+        render(body) {
+            const src = area("少壮不努力，老大徒伤悲。", 4);
+            const mode = el("select", {class: "tool-input sm"},
+                el("option", {value: "pair", text: "对照 字(拼音)"}),
+                el("option", {value: "py", text: "仅拼音"}),
+                el("option", {value: "char", text: "仅汉字"}));
+            const toneStyle = el("select", {class: "tool-input sm"},
+                el("option", {value: "mark", text: "带声调"}),
+                el("option", {value: "num", text: "数字声调"}),
+                el("option", {value: "plain", text: "无声调"}));
+            const caseStyle = el("select", {class: "tool-input sm"},
+                el("option", {value: "lower", text: "小写"}),
+                el("option", {value: "title", text: "首字母大写"}),
+                el("option", {value: "upper", text: "全大写"}));
+            const poly = el("select", {class: "tool-input sm"},
+                el("option", {value: "first", text: "常用读音"}),
+                el("option", {value: "all", text: "全部读音"}));
+            const out = area("", 8);
+            out.readOnly = true;
+            const update = () => {
+                let result = "";
+                for (const ch of src.value) {
+                    const info = hanziLookup(ch);
+                    if (!info) { result += ch; continue; }
+                    const pys = (poly.value === "all" ? info.pinyin : info.pinyin.slice(0, 1)).map(p => {
+                        let s = formatPinyin(p, toneStyle.value);
+                        if (caseStyle.value === "upper") s = s.toUpperCase();
+                        else if (caseStyle.value === "title") s = capFirst(s);
+                        return s;
+                    });
+                    const joined = pys.join("/");
+                    if (mode.value === "py") result += joined + " ";
+                    else if (mode.value === "char") result += ch;
+                    else result += `${ch}(${joined})`;
+                }
+                out.value = result.trim();
+            };
+            [src, mode, toneStyle, caseStyle, poly].forEach(n => n.addEventListener("input", update));
+            update();
+            body.append(field("输入中文文本", src),
+                el("div", {class: "tool-actions"},
+                    el("div", {}, field("输出格式", mode)),
+                    el("div", {}, field("声调", toneStyle)),
+                    el("div", {}, field("大小写", caseStyle)),
+                    el("div", {}, field("多音字", poly)),
+                    copyBtn(() => out.value)),
+                field("注音结果", out),
+                note("覆盖通用规范汉字表 8105 常用字，多音字默认取常用读音，数据纯本地。"));
         }
     }
 ];
