@@ -313,3 +313,26 @@ select.tool-input { cursor: pointer; }
 [data-theme="light"] .doc-code { background: #f2f5f8; }
 [data-theme="light"] .docs-dialog { background: #ffffff; }
 [data-theme="light"] .docs-dialog::backdrop { background: rgba(220,226,232,.65); }
+
+/* ---- 可折叠树视图(JSON / XML) ---- */
+.tree-box { margin-top: .25rem; }
+.tree-search { width: 100%; margin-bottom: .55rem; }
+.tree-body { max-height: 420px; overflow: auto; padding: .55rem; border: 1px solid var(--line); border-radius: 8px; background: rgba(0,0,0,.18); font: .74rem/1.75 ui-monospace, monospace; }
+.tree-row { display: flex; align-items: baseline; gap: .45rem; padding: .5px 4px; border-radius: 4px; white-space: nowrap; cursor: default; }
+.tree-row:hover { background: rgba(255,255,255,.045); }
+.tree-children { padding-left: 1.2em; }
+.tree-toggle { display: inline-grid; place-items: center; width: 1.1em; flex: none; color: #8a96a1; cursor: pointer; user-select: none; }
+.tree-toggle.leaf { visibility: hidden; }
+.tree-label { color: #eef3f7; }
+.tree-label.tag { color: var(--cyan); }
+.tree-attr { color: #8a96a1; }
+.tree-value { color: var(--lime); }
+.tree-count { margin-left: .1rem; color: #6b7681; font-size: .64rem; }
+[data-theme="light"] .tree-body { background: #f7f9fb; }
+[data-theme="light"] .tree-row:hover { background: rgba(15,25,35,.05); }
+[data-theme="light"] .tree-toggle { color: #5d6873; }
+[data-theme="light"] .tree-label { color: #1b2229; }
+[data-theme="light"] .tree-label.tag { color: #0077a3; }
+[data-theme="light"] .tree-attr { color: #6b7681; }
+[data-theme="light"] .tree-value { color: #3a6b00; }
+[data-theme="light"] .tree-count { color: #7a8691; }

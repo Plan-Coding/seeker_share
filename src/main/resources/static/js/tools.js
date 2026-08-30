@@ -869,6 +869,112 @@ function minifyNode(node) {
     return open + node.children.map(minifyNode).join("") + "</" + node.name + ">";
 }
 
+/* ---- 可折叠树视图(JSON / XML 共用) ---- */
+function jsonToTree(value, key) {
+    if (value === null) return {label: key || "", value: "null", kind: "null", search: `${key || ""} null`, children: null};
+    if (Array.isArray(value)) {
+        return {label: key || "[]", value: null, kind: "array", search: `${key || ""} array`,
+            children: value.map((v, i) => jsonToTree(v, `[${i}]`))};
+    }
+    if (typeof value === "object") {
+        const keys = Object.keys(value);
+        return {label: key || "{}", value: null, kind: "object", search: `${key || ""} object`,
+            children: keys.map(k => jsonToTree(value[k], k))};
+    }
+    const text = typeof value === "string" ? JSON.stringify(value) : String(value);
+    return {label: key || "", value: text, kind: "leaf", search: `${key || ""} ${text}`, children: null};
+}
+
+function xmlToTrees(root) {
+    const out = [];
+    const convert = (node) => {
+        if (node.type === "text") {
+            if (!node.value.trim()) return null;
+            return {label: "#text", value: node.value, kind: "text", search: node.value, children: null};
+        }
+        if (node.type === "comment") return {label: "<!-- 注释 -->", value: null, kind: "comment", search: node.value, children: null};
+        if (node.type === "cdata") return {label: "<![CDATA[", value: null, kind: "cdata", search: node.value, children: null};
+        if (node.type === "pi") return {label: "<? 处理指令 ?>", value: null, kind: "pi", search: node.value, children: null};
+        if (node.type === "doctype") return {label: "<!DOCTYPE>", value: null, kind: "doctype", search: node.value, children: null};
+        const children = node.children.map(convert).filter(Boolean);
+        const attrs = node.attrs.map(([k, v]) => `${k}="${v}"`);
+        const textParts = node.children.filter(c => c.type === "text" && c.value.trim());
+        const inline = textParts.length ? textParts.map(c => c.value.trim()).join(" ") : null;
+        return {label: `<${node.name}>`, value: inline, kind: "element", attrs,
+            search: `${node.name} ${attrs.join(" ")} ${inline || ""}`, children};
+    };
+    for (const child of root.children) {
+        const node = convert(child);
+        if (node) out.push(node);
+    }
+    return out;
+}
+
+function treeView(container, roots) {
+    container.replaceChildren();
+    const openSet = new Set();
+    roots.forEach(r => { if (r.children && r.children.length) openSet.add(r); });
+    let query = "";
+    const searchBox = el("input", {type: "search", class: "tool-input tree-search", placeholder: "搜索键名 / 值 / 标签…",
+        oninput: () => { query = searchBox.value.trim().toLowerCase(); render(); }});
+    const body = el("div", {class: "tree-body"});
+    container.append(searchBox, body);
+    const norm = (s) => String(s || "").toLowerCase();
+    const nodeMatches = (n) => query !== "" && norm(n.search).includes(query);
+    const hasMatch = (n) => nodeMatches(n) || (n.children || []).some(hasMatch);
+    const showChildren = (n) => {
+        if (!n.children || !n.children.length) return false;
+        if (query !== "") return hasMatch(n);
+        return openSet.has(n);
+    };
+    function highlight(target, text) {
+        if (query) {
+            const i = norm(text).indexOf(query);
+            if (i >= 0) {
+                target.append(text.slice(0, i), el("mark", {class: "hl-match", text: text.slice(i, i + query.length)}), text.slice(i + query.length));
+                return;
+            }
+        }
+        target.textContent = text;
+    }
+    function renderRow(n, depth) {
+        const hasKids = n.children && n.children.length > 0;
+        const isOpen = showChildren(n);
+        const row = el("div", {class: "tree-row"});
+        const toggle = el("span", {class: "tree-toggle" + (hasKids ? (isOpen ? " open" : "") : " leaf"), text: hasKids ? (isOpen ? "▾" : "▸") : ""});
+        row.append(toggle);
+        const label = el("span", {class: "tree-label" + (n.kind === "element" ? " tag" : "")});
+        highlight(label, n.label);
+        row.append(label);
+        if (n.attrs && n.attrs.length) {
+            const attr = el("span", {class: "tree-attr"});
+            highlight(attr, n.attrs.join(" "));
+            row.append(attr);
+        }
+        if (n.value !== null && n.value !== undefined && n.value !== "") {
+            const value = el("span", {class: "tree-value"});
+            highlight(value, n.value);
+            row.append(value);
+        }
+        if (hasKids && !isOpen) row.append(el("span", {class: "tree-count", text: `${n.children.length}`}));
+        row.onclick = () => { if (hasKids) { openSet.has(n) ? openSet.delete(n) : openSet.add(n); render(); } };
+        return row;
+    }
+    function walk(nodes, parent) {
+        for (const n of nodes) {
+            if (query !== "" && !hasMatch(n)) continue;
+            parent.append(renderRow(n));
+            if (showChildren(n)) {
+                const wrap = el("div", {class: "tree-children"});
+                parent.append(wrap);
+                walk(n.children, wrap);
+            }
+        }
+    }
+    function render() { body.replaceChildren(); walk(roots, body); }
+    render();
+}
+
 /* ---- 颜色 ---- */
 function hexToRgb(hex) {
     const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
@@ -1420,11 +1526,16 @@ const TOOLS = [
     /* ---------- 解析校验 ---------- */
     {
         id: "json", cat: "parse", icon: "{}", name: "JSON 格式化",
-        desc: "格式化、压缩、校验 JSON，支持递归排序键名",
+        desc: "格式化、压缩、校验 JSON，支持递归排序键名、可折叠与搜索的树形视图",
         render(body) {
             const src = area('{"name":"seeker-share","tags":["lan","share"],"config":{"port":8080,"storage":1073741824}}', 7);
             const out = area("", 8);
             out.readOnly = true;
+            const treeBox = el("div", {class: "tree-box"});
+            const outField = field("输出结果（文本）", out);
+            const treeField = field("树形视图（点击折叠 · 支持搜索）", treeBox);
+            let lastText = "";
+            let view = "tree";
             const sortValue = (value) => {
                 if (Array.isArray(value)) return value.map(sortValue);
                 if (value && typeof value === "object") {
@@ -1434,21 +1545,32 @@ const TOOLS = [
                 }
                 return value;
             };
+            const renderTree = (parsed) => { try { treeView(treeBox, [jsonToTree(parsed, "")]); } catch { /* 忽略 */ } };
             const run = (label, fn) => {
                 try {
                     const parsed = JSON.parse(src.value);
-                    out.value = fn(parsed);
+                    lastText = fn(parsed);
+                    out.value = lastText;
+                    if (view === "tree") renderTree(parsed);
                     showToast(label + "成功");
-                } catch (error) { out.value = ""; showToast(`JSON 解析失败：${error.message}`, true); }
+                } catch (error) { out.value = ""; treeBox.replaceChildren(); showToast(`JSON 解析失败：${error.message}`, true); }
             };
+            const viewBtn = btn("文本视图", () => {
+                view = view === "tree" ? "text" : "tree";
+                viewBtn.textContent = view === "tree" ? "文本视图" : "树形视图";
+                outField.hidden = view === "tree";
+                treeField.hidden = view === "text";
+                if (view === "tree" && lastText) { try { renderTree(JSON.parse(lastText)); } catch { /* 忽略 */ } }
+            });
             body.append(field("输入 JSON", src),
                 el("div", {class: "tool-actions"},
                     btn("格式化 2 空格", () => run("格式化", v => JSON.stringify(v, null, 2)), true),
                     btn("格式化 4 空格", () => run("格式化", v => JSON.stringify(v, null, 4))),
                     btn("压缩", () => run("压缩", v => JSON.stringify(v))),
                     btn("键名排序", () => run("排序", v => JSON.stringify(sortValue(v), null, 2))),
+                    viewBtn,
                     copyBtn(() => out.value)),
-                field("输出结果", out));
+                outField, treeField);
         }
     },
     {
@@ -1479,22 +1601,40 @@ const TOOLS = [
     },
     {
         id: "xmlfmt", cat: "parse", icon: "</>", name: "XML 格式化",
-        desc: "格式化、压缩、校验 XML，保留注释与 CDATA",
+        desc: "格式化、压缩、校验 XML，保留注释与 CDATA，支持可折叠与搜索的树形视图",
         render(body) {
             const src = area('<?xml version="1.0" encoding="UTF-8"?>\n<server>\n<name>seeker-share</name><port>8080</port><note>Hello <b>world</b></note>\n</server>', 8);
             const out = area("", 10);
             out.readOnly = true;
+            const treeBox = el("div", {class: "tree-box"});
+            const outField = field("输出结果（文本）", out);
+            const treeField = field("树形视图（点击折叠 · 支持搜索）", treeBox);
+            let lastText = "";
+            let view = "tree";
+            const renderTree = () => { try { treeView(treeBox, xmlToTrees(buildTree(tokenizeXml(src.value)))); } catch { /* 忽略 */ } };
             const run = (label, fn) => {
-                try { out.value = fn(src.value); showToast(label + "成功"); }
-                catch (error) { out.value = ""; showToast(`XML 解析失败：${error.message}`, true); }
+                try {
+                    lastText = fn(src.value);
+                    out.value = lastText;
+                    if (view === "tree") renderTree();
+                    showToast(label + "成功");
+                } catch (error) { out.value = ""; treeBox.replaceChildren(); showToast(`XML 解析失败：${error.message}`, true); }
             };
+            const viewBtn = btn("文本视图", () => {
+                view = view === "tree" ? "text" : "tree";
+                viewBtn.textContent = view === "tree" ? "文本视图" : "树形视图";
+                outField.hidden = view === "tree";
+                treeField.hidden = view === "text";
+                if (view === "tree" && lastText) { try { renderTree(); } catch { /* 忽略 */ } }
+            });
             body.append(field("输入 XML", src),
                 el("div", {class: "tool-actions"},
                     btn("格式化 2 空格", () => run("格式化", v => formatXml(v, "  ")), true),
                     btn("格式化 4 空格", () => run("格式化", v => formatXml(v, "    "))),
                     btn("压缩", () => run("压缩", v => minifyXml(v))),
+                    viewBtn,
                     copyBtn(() => out.value)),
-                field("输出结果", out),
+                outField, treeField,
                 note("自动校验标签闭合与匹配；保留注释 / CDATA / 处理指令，混排文本保持一行。"));
         }
     },
