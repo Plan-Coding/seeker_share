@@ -5,6 +5,8 @@ const state = {
     admin: {users: [], roles: [], permissions: [], loaded: false}
 };
 const selectedUserIds = new Set();
+const adminPagers = { user: { current: 0 }, role: { current: 0 } };
+const PAGE_SIZE = 20;
 const $ = (selector) => document.querySelector(selector);
 const messageForm = $("#messageForm");
 const messageInput = $("#messageInput");
@@ -559,6 +561,8 @@ async function loadAdminData(force = false) {
 
 function renderAdmin() {
     selectedUserIds.clear();
+    adminPagers.user.current = 0;
+    adminPagers.role.current = 0;
     $("#adminUserCount").textContent = state.admin.users.length;
     $("#adminRoleCount").textContent = state.admin.roles.length;
     $("#adminPermissionCount").textContent = state.admin.permissions.length;
@@ -581,11 +585,34 @@ function renderNewRolePermissions() {
         adminCheck("new-role-permission", permission.code, permission.description, false, permission.code)));
 }
 
+function paginate(items, kind) {
+    const pager = adminPagers[kind];
+    const pages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+    pager.current = Math.min(Math.max(pager.current, 0), pages - 1);
+    const start = pager.current * PAGE_SIZE;
+    return {page: items.slice(start, start + PAGE_SIZE), total: items.length, pages, current: pager.current};
+}
+
+function refreshPagination(kind, total) {
+    const pager = adminPagers[kind];
+    const prefix = kind === "user" ? "adminUser" : "adminRole";
+    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const box = $(`#${prefix}Pagination`);
+    box.hidden = total <= PAGE_SIZE;
+    $(`#${prefix}PageNow`).textContent = pager.current + 1;
+    $(`#${prefix}PageTotal`).textContent = pages;
+    $(`#${prefix}Total`).textContent = total;
+    box.querySelector('[data-dir="prev"]').disabled = pager.current === 0;
+    box.querySelector('[data-dir="next"]').disabled = pager.current >= pages - 1;
+}
+
 function renderAdminUsers() {
     const query = $("#adminUserSearch").value.trim().toLowerCase();
-    const users = state.admin.users.filter(user =>
+    const filtered = state.admin.users.filter(user =>
         `${user.username} ${user.roles.join(" ")}`.toLowerCase().includes(query));
-    $("#adminUserList").replaceChildren(...users.map(createAdminUser));
+    const result = paginate(filtered, "user");
+    $("#adminUserList").replaceChildren(...result.page.map(createAdminUser));
+    refreshPagination("user", result.total);
 }
 
 function createAdminUser(user) {
@@ -660,7 +687,11 @@ function createAdminUser(user) {
 }
 
 function renderAdminRoles() {
-    $("#adminRoleList").replaceChildren(...state.admin.roles.map(role => {
+    const query = $("#adminRoleSearch").value.trim().toLowerCase();
+    const filtered = state.admin.roles.filter(role =>
+        `${role.name} ${role.description} ${role.permissions.join(" ")}`.toLowerCase().includes(query));
+    const result = paginate(filtered, "role");
+    $("#adminRoleList").replaceChildren(...result.page.map(role => {
         const form = document.createElement("form");
         form.className = "admin-role-card glass";
         form.dataset.roleId = role.id;
@@ -692,6 +723,7 @@ function renderAdminRoles() {
         form.append(heading, description, checks, actions);
         return form;
     }));
+    refreshPagination("role", result.total);
 }
 
 function adminCheck(group, value, label, checked, code = "") {
@@ -734,7 +766,24 @@ function formatAdminDate(value) {
 }
 
 $("#refreshAdmin").addEventListener("click", () => loadAdminData(true));
-$("#adminUserSearch").addEventListener("input", () => { renderAdminUsers(); updateBatchSelection(); });
+$("#adminUserSearch").addEventListener("input", () => {
+    adminPagers.user.current = 0;
+    renderAdminUsers();
+    updateBatchSelection();
+});
+$("#adminRoleSearch").addEventListener("input", () => {
+    adminPagers.role.current = 0;
+    renderAdminRoles();
+});
+
+$("#viewAdmin").addEventListener("click", event => {
+    const button = event.target.closest(".admin-pagination button");
+    if (!button) return;
+    const kind = button.dataset.list;
+    adminPagers[kind].current += button.dataset.dir === "prev" ? -1 : 1;
+    if (kind === "user") { renderAdminUsers(); updateBatchSelection(); }
+    else renderAdminRoles();
+});
 
 function updateBatchSelection() {
     const checkboxes = [...document.querySelectorAll("#adminUserList .user-select:not(:disabled)")];

@@ -285,6 +285,10 @@ footer strong { color: #7c8791; }
 .admin-batch-tools .select-all strong { color: #99a4ad; font-size: .6rem; font-weight: 600; }
 .admin-selected-count { color: var(--lime); font: .56rem/1 ui-monospace,monospace; }
 .admin-user-list,.admin-role-list { display: grid; gap: .55rem; }
+.admin-role-panel { display: grid; gap: .55rem; min-width: 0; }
+.admin-pagination { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .15rem; }
+.admin-pagination .admin-page-info { color: #5f6b75; font: .56rem/1 ui-monospace,monospace; }
+.admin-pagination .admin-page-info b { color: var(--lime); font-weight: 600; }
 .admin-user { display: grid; grid-template-columns: minmax(20px,auto) minmax(180px,1fr) minmax(150px,.8fr) auto; align-items: center; gap: .75rem; padding: .9rem; border: 1px solid var(--line); background: rgba(4,7,10,.45); }
 .admin-user > .user-select { width: 14px; height: 14px; accent-color: var(--lime); cursor: pointer; }
 .admin-user > .user-select:disabled { cursor: not-allowed; opacity: .3; }

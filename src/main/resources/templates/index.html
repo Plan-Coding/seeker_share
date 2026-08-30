@@ -212,6 +212,11 @@
                         </div>
                     </div>
                     <div id="adminUserList" class="admin-user-list" aria-live="polite"></div>
+                    <div class="admin-pagination" id="adminUserPagination" hidden>
+                        <button class="admin-button" type="button" data-list="user" data-dir="prev">‹ 上一页</button>
+                        <span class="admin-page-info">第 <b id="adminUserPageNow">1</b> / <span id="adminUserPageTotal">1</span> 页 · 共 <span id="adminUserTotal">0</span> 条</span>
+                        <button class="admin-button" type="button" data-list="user" data-dir="next">下一页 ›</button>
+                    </div>
                 </div>
             </div>
         </section>
@@ -226,7 +231,15 @@
                     <fieldset><legend>权限</legend><div id="newRolePermissions" class="admin-checks permission-checks"></div></fieldset>
                     <button class="beam-button" type="submit"><span>创建角色</span><i>＋</i></button>
                 </form>
-                <div id="adminRoleList" class="admin-role-list" aria-live="polite"></div>
+                <div class="admin-role-panel">
+                    <div class="admin-list-tools"><label><span>⌕</span><input id="adminRoleSearch" type="search" placeholder="搜索角色名或说明"></label></div>
+                    <div id="adminRoleList" class="admin-role-list" aria-live="polite"></div>
+                    <div class="admin-pagination" id="adminRolePagination" hidden>
+                        <button class="admin-button" type="button" data-list="role" data-dir="prev">‹ 上一页</button>
+                        <span class="admin-page-info">第 <b id="adminRolePageNow">1</b> / <span id="adminRolePageTotal">1</span> 页 · 共 <span id="adminRoleTotal">0</span> 条</span>
+                        <button class="admin-button" type="button" data-list="role" data-dir="next">下一页 ›</button>
+                    </div>
+                </div>
             </div>
         </section>
     </div>
