@@ -86,25 +86,32 @@ public class AdminAccountController {
 	}
 
 	public record CreateUserRequest(
-			@NotBlank @Pattern(regexp = "^[a-zA-Z0-9_.-]{3,50}$", message = "用户名只能包含字母、数字、点、横线和下划线") String username,
-			@NotBlank @Size(max = 128) String initialPassword,
-			Set<String> roles) { }
+			@NotBlank(message = "用户名不能为空")
+			@Pattern(regexp = "^[a-zA-Z0-9_.-]{3,50}$", message = "用户名只能包含字母、数字、点、横线和下划线，长度 3-50 位") String username,
+			@NotBlank(message = "初始密码不能为空") @Size(max = 128, message = "初始密码不能超过 128 位") String initialPassword,
+			Set<String> roles) {
+		public CreateUserRequest {
+			username = username == null ? null : username.strip();
+		}
+	}
 
 	public record UserStatusRequest(Boolean enabled, boolean unlock) { }
 	public record UserRolesRequest(Set<String> roles) {
 		public UserRolesRequest { roles = roles == null ? Set.of() : Set.copyOf(roles); }
 	}
-	public record ResetPasswordRequest(@NotBlank @Size(max = 128) String initialPassword) { }
+	public record ResetPasswordRequest(
+			@NotBlank(message = "初始密码不能为空") @Size(max = 128, message = "初始密码不能超过 128 位") String initialPassword) { }
 	public record RoleRequest(
-			@NotBlank @Pattern(regexp = "^[A-Z][A-Z0-9_]{2,49}$") String name,
-			@NotBlank @Size(max = 100) String description,
+			@NotBlank(message = "角色名不能为空")
+			@Pattern(regexp = "^[A-Z][A-Z0-9_]{2,49}$", message = "角色名只能包含大写字母、数字和下划线，以字母开头，长度 3-50 位") String name,
+			@NotBlank(message = "角色描述不能为空") @Size(max = 100, message = "角色描述不能超过 100 字") String description,
 			Set<PermissionCode> permissions) {
 		public RoleRequest {
 			permissions = permissions == null ? Set.of() : Set.copyOf(permissions);
 		}
 	}
 	public record UpdateRoleRequest(
-			@NotBlank @Size(max = 100) String description,
+			@NotBlank(message = "角色描述不能为空") @Size(max = 100, message = "角色描述不能超过 100 字") String description,
 			Set<PermissionCode> permissions) {
 		public UpdateRoleRequest {
 			permissions = permissions == null ? Set.of() : Set.copyOf(permissions);

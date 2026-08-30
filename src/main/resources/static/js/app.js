@@ -728,10 +728,16 @@ $("#createUserForm").addEventListener("submit", async event => {
     const button = event.currentTarget.querySelector("button[type=submit]");
     button.disabled = true;
     try {
+        const usernameInput = $("#adminNewUsername");
+        const username = usernameInput.value.trim();
+        if (!/^[a-zA-Z0-9_.-]{3,50}$/.test(username)) {
+            showToast("用户名只能包含字母、数字、点、横线和下划线，长度 3-50 位", true);
+            return;
+        }
         const roles = hasPermission("ROLE_MANAGE") ? checkedValues($("#newUserRoles")) : [];
         await request("/api/v1/admin/users", {
             method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username: $("#adminNewUsername").value, initialPassword: $("#adminNewPassword").value, roles})
+            body: JSON.stringify({username, initialPassword: $("#adminNewPassword").value, roles})
         });
         event.currentTarget.reset();
         showToast("用户已创建");
@@ -886,7 +892,14 @@ function showToast(message, error = false) {
     clearTimeout(toastTimer);
     toast.querySelector("span").textContent = message;
     toast.className = `toast visible${error ? " error" : ""}`;
-    toastTimer = setTimeout(() => toast.className = "toast", 2600);
+    if (toast.popover) {
+        try { if (toast.matches(":popover-open")) toast.hidePopover(); } catch { }
+        try { toast.showPopover(); } catch { }
+    }
+    toastTimer = setTimeout(() => {
+        toast.className = "toast";
+        if (toast.popover) { try { toast.hidePopover(); } catch { } }
+    }, 2600);
 }
 
 function startParticles() {

@@ -260,6 +260,7 @@ footer strong { color: #7c8791; }
 .admin-form { position: sticky; top: 90px; }
 .admin-form h3 { margin: 0; font-size: 1rem; }
 .admin-form > p,.admin-dialog p { margin: .45rem 0 1rem; color: var(--muted); font-size: .68rem; line-height: 1.55; }
+.admin-form .form-hint,.admin-dialog .form-hint { margin: .35rem 0 0; color: var(--muted); font-size: .62rem; line-height: 1.5; }
 .admin-form > label,.admin-dialog label { display: grid; gap: .4rem; margin-top: .75rem; }
 .admin-form label > span,.admin-dialog label > span,.admin-form legend { color: #7f8a94; font: 650 .59rem/1 ui-monospace,monospace; letter-spacing: .1em; }
 .admin-form input,.admin-dialog input,.role-description { width: 100%; min-height: 42px; padding: .65rem .75rem; border: 1px solid var(--line); outline: 0; background: rgba(2,5,8,.68); color: var(--text); }

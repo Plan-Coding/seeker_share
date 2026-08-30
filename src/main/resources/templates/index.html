@@ -192,7 +192,8 @@
                 <form id="createUserForm" class="admin-form glass">
                     <h3>创建账户</h3><p>新账户首次登录时必须修改初始密码。</p>
                     <label><span>用户名</span><input id="adminNewUsername" maxlength="50" pattern="[a-zA-Z0-9_.-]{3,50}" required></label>
-                    <label><span>初始密码</span><input id="adminNewPassword" type="password" maxlength="128" autocomplete="new-password" required></label>
+                    <label><span>初始密码</span><input id="adminNewPassword" type="password" maxlength="128" autocomplete="new-password" required minlength="12"></label>
+                    <p class="form-hint">至少 12 位，需包含大写字母、小写字母、数字和特殊字符。</p>
                     <fieldset id="newUserRoles"><legend>分配角色</legend><div class="admin-checks"></div></fieldset>
                     <button class="beam-button" type="submit"><span>创建用户</span><i>＋</i></button>
                 </form>
@@ -222,7 +223,8 @@
         <form id="resetPasswordForm" method="dialog">
             <span class="kicker"><i></i> CREDENTIAL RESET</span><h2>重置初始密码</h2>
             <p>用户下次登录后必须立即修改此密码。</p>
-            <label><span>新初始密码</span><input id="resetPasswordValue" type="password" maxlength="128" autocomplete="new-password" required></label>
+            <label><span>新初始密码</span><input id="resetPasswordValue" type="password" maxlength="128" autocomplete="new-password" required minlength="12"></label>
+            <p class="form-hint">至少 12 位，需包含大写字母、小写字母、数字和特殊字符。</p>
             <div class="dialog-actions"><button value="cancel" class="admin-button" type="button">取消</button><button class="admin-button primary" type="submit">确认重置</button></div>
         </form>
     </dialog>
@@ -230,6 +232,6 @@
     <footer><span>SEEKER SHARE / LOCAL ONLY</span><span>内容将在 <strong>24 小时</strong>后自动销毁</span></footer>
 </main>
 
-<div id="toast" class="toast" role="status" aria-live="polite"><i></i><span></span></div>
+<div id="toast" class="toast" popover="manual" role="status" aria-live="polite"><i></i><span></span></div>
 </body>
 </html>

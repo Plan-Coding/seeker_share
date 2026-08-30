@@ -106,6 +106,27 @@ class AdminAccountManagementTests {
 	}
 
 	@Test
+	void createUserValidationErrorsReturnChineseProblemDetail() throws Exception {
+		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"username\":\"中文名\",\"initialPassword\":\"Weak#123\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("用户名只能包含字母、数字、点、横线和下划线，长度 3-50 位"));
+
+		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"username\":\"valid.name\",\"initialPassword\":\"Weak#123\"}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("密码强度不足：至少 12 个字符"));
+
+		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("not json"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("请求体格式错误，请检查请求内容"));
+	}
+
+	@Test
 	void disablingAccountRevokesItsExistingAuthenticationImmediately() throws Exception {
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
