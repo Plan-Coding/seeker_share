@@ -7,3 +7,4 @@
 | 技能 | 说明 |
 | --- | --- |
 | [toolbox-tool](toolbox-tool/SKILL.md) | 在工具箱中新增一个纯前端小工具(TOOLS 注册、CSS、验证) |
+| [page-conventions](page-conventions/SKILL.md) | 通用页面/列表规范:分页、搜索、空状态、危险操作确认、反馈等 |
