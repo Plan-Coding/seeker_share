@@ -4,6 +4,20 @@
 
 Seeker Share 用于在同一局域网内快速传递文字、链接、代码片段和文件。项目采用单机部署，数据不会经过第三方云服务。共享广场需要登录，公开注册关闭；工具箱保持匿名可用。
 
+## 界面预览
+
+### 共享广场
+
+![Seeker Share 共享广场](docs/images/share.png)
+
+### 运维工具箱
+
+![Seeker Share 运维工具箱](docs/images/tools.png)
+
+### 用户与权限管理
+
+![Seeker Share 用户与权限管理](docs/images/admin.png)
+
 ## 核心能力
 
 ### 共享广场
