@@ -1,8 +1,8 @@
 # Seeker Share
 
-> 一个轻量、炫酷、无需数据库的局域网消息与文件共享节点，内置 23 个纯前端运维小工具。
+> 一个轻量、炫酷、基于 H2 的局域网消息与文件共享节点，内置 23 个纯前端运维小工具。
 
-Seeker Share 用于在同一局域网内快速传递文字、链接、代码片段和文件。项目采用单机部署，数据不会经过第三方云服务，也不需要注册账号。页面内置导航，可在「共享广场」与「工具箱」之间切换。
+Seeker Share 用于在同一局域网内快速传递文字、链接、代码片段和文件。项目采用单机部署，数据不会经过第三方云服务。共享广场需要登录，公开注册关闭；工具箱保持匿名可用。
 
 ## 核心能力
 
@@ -17,8 +17,11 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 - 自动发现并展示可用的局域网访问地址
 - 默认 24 小时自动销毁过期内容
 - 默认限制总共享空间为 1GB
-- 可通过管理员口令保护删除操作
-- 无数据库依赖：消息保存在内存，文件保存在本机目录
+- 删除与清空操作分别受独立权限控制
+- H2 持久化共享元数据，文件正文保存在本机目录
+- 基于用户、角色、权限的 RBAC 鉴权，所有共享 API 均由后端强制校验
+- 自动初始化管理员与管理员/成员角色，不开放公开注册
+- 初始账户首次登录必须修改密码，包含密码强度检查与登录失败锁定
 - 响应式赛博终端界面，适配桌面端和移动端
 
 ### 运维工具箱
@@ -51,9 +54,12 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 
 ## 技术栈
 
-- Java 21
+- Java 25
 - Spring Boot 4.1.1
 - Spring Web MVC
+- Spring Security
+- Spring Data JPA / Hibernate
+- H2 Database
 - Thymeleaf
 - Jakarta Validation
 - Server-Sent Events（SSE）
@@ -75,8 +81,16 @@ cd seeker_share
 
 - 首页（共享广场）：<http://localhost:8080/>
 - 运维工具箱：<http://localhost:8080/#/tools>
+- 用户与权限管理：<http://localhost:8080/#/admin>（仅向具备管理权限的账户显示）
 - 共享 API：<http://localhost:8080/api/v1/shares>
 - 健康检查：<http://localhost:8080/actuator/health>
+
+首次启动会创建管理员账户：
+
+- 用户名：`admin`
+- 初始密码：`ChangeMe!2026`
+
+首次登录后必须立即设置至少 12 位、同时包含大小写字母、数字和特殊字符的密码。生产环境请通过下方环境变量覆盖初始凭据。
 
 同一局域网内的其他设备使用运行主机的 IP 地址访问，例如：
 
@@ -95,12 +109,19 @@ http://192.168.1.10:8080
 | `SHARE_STORAGE` | 系统临时目录 | 上传文件的保存目录 |
 | `EXPIRATION_HOURS` | `24` | 内容自动过期时间，单位为小时 |
 | `MAX_STORAGE_BYTES` | `1073741824` | 允许使用的最大文件空间，默认 1GB |
-| `ADMIN_TOKEN` | 空 | 删除单条记录或清空全部内容时使用的管理员口令 |
+| `SEEKER_DB_PATH` | `./data/seeker-share` | H2 数据库文件路径（无需扩展名） |
+| `SEEKER_DB_USERNAME` | `sa` | H2 用户名 |
+| `SEEKER_DB_PASSWORD` | 空 | H2 密码 |
+| `ADMIN_USERNAME` | `admin` | 首次初始化的管理员用户名 |
+| `ADMIN_INITIAL_PASSWORD` | `ChangeMe!2026` | 管理员初始密码，仅首次建号使用 |
+| `MAX_FAILED_LOGIN_ATTEMPTS` | `5` | 连续登录失败后的锁定阈值 |
 
 推荐的启动方式：
 
 ```bash
-ADMIN_TOKEN=your-secret \
+ADMIN_USERNAME=admin \
+ADMIN_INITIAL_PASSWORD='replace-with-a-strong-password' \
+SEEKER_DB_PATH=/data/seeker-share/db \
 SHARE_STORAGE=/data/seeker-share \
 EXPIRATION_HOURS=24 \
 MAX_STORAGE_BYTES=1073741824 \
@@ -120,6 +141,7 @@ java -jar target/seeker-share-0.0.1-SNAPSHOT.jar
 ```text
 src/main/java/com/seeker/share/
 ├── common/       # 通用 API 响应
+├── security/     # 用户、角色、权限、认证与安全配置
 ├── share/        # 分享模型、存储、清理和实时事件服务
 └── web/          # 页面与 REST 控制器
 src/main/resources/
@@ -131,7 +153,9 @@ src/main/resources/
 
 ## 数据说明
 
-本项目不使用数据库。服务停止或重启后，内存中的消息和文件索引不会保留，请勿将它作为永久文件存储或备份系统使用。
+账户、角色、权限和共享元数据保存在 H2 数据库中，上传文件正文保存在 `SHARE_STORAGE` 指定的目录。迁移或备份时必须同时保留数据库文件与上传目录。
+
+公开注册功能未提供。管理员可通过受 `USER_MANAGE` 权限保护的 `/api/v1/admin/users` 接口创建、停用、解锁账户或重置初始密码；角色及权限管理接口受 `ROLE_MANAGE` 权限保护。
 
 ## 免责声明
 

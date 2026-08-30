@@ -1,7 +1,6 @@
 package com.seeker.share.web;
 
 import com.seeker.share.common.ApiResponse;
-import com.seeker.share.share.AdminGuard;
 import com.seeker.share.share.MessageRequest;
 import com.seeker.share.share.ShareEventService;
 import com.seeker.share.share.ShareItem;
@@ -9,6 +8,7 @@ import com.seeker.share.share.ShareService;
 import com.seeker.share.share.ShareSnapshot;
 import com.seeker.share.share.StoredFile;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -24,7 +24,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,12 +36,10 @@ public class ShareController {
 
 	private final ShareService shareService;
 	private final ShareEventService events;
-	private final AdminGuard adminGuard;
 
-	public ShareController(ShareService shareService, ShareEventService events, AdminGuard adminGuard) {
+	public ShareController(ShareService shareService, ShareEventService events) {
 		this.shareService = shareService;
 		this.events = events;
-		this.adminGuard = adminGuard;
 	}
 
 	@GetMapping
@@ -51,8 +48,8 @@ public class ShareController {
 	}
 
 	@GetMapping(value = "/events", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-	public SseEmitter events() {
-		return events.connect();
+	public SseEmitter events(HttpServletRequest request) {
+		return events.connect(request.getRemoteAddr(), request.getHeader(HttpHeaders.USER_AGENT));
 	}
 
 	@PostMapping("/messages")
@@ -81,18 +78,13 @@ public class ShareController {
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<Void> delete(
-			@PathVariable UUID id,
-			@RequestHeader(name = "X-Admin-Token", required = false) String token) throws IOException {
-		adminGuard.verify(token);
+	public ResponseEntity<Void> delete(@PathVariable UUID id) throws IOException {
 		shareService.delete(id);
 		return ResponseEntity.noContent().build();
 	}
 
 	@DeleteMapping
-	public ResponseEntity<Void> clear(
-			@RequestHeader(name = "X-Admin-Token", required = false) String token) throws IOException {
-		adminGuard.verify(token);
+	public ResponseEntity<Void> clear() throws IOException {
 		shareService.clear();
 		return ResponseEntity.noContent().build();
 	}

@@ -8,15 +8,13 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -24,7 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 public class ShareService {
 
-	private final Map<UUID, ShareItem> items = new ConcurrentHashMap<>();
+	private final ShareEntryRepository repository;
 	private final Path storageLocation;
 	private final long storageLimit;
 	private final long expirationHours;
@@ -34,10 +32,12 @@ public class ShareService {
 			@Value("${seeker.share.storage-location}") String storageLocation,
 			@Value("${seeker.share.max-storage-bytes}") long storageLimit,
 			@Value("${seeker.share.expiration-hours}") long expirationHours,
+			ShareEntryRepository repository,
 			ShareEventService events) {
 		this.storageLocation = Path.of(storageLocation).toAbsolutePath().normalize();
 		this.storageLimit = storageLimit;
 		this.expirationHours = expirationHours;
+		this.repository = repository;
 		this.events = events;
 	}
 
@@ -46,35 +46,37 @@ public class ShareService {
 		Files.createDirectories(storageLocation);
 	}
 
+	@Transactional(readOnly = true)
 	public ShareSnapshot snapshot() {
-		List<ShareItem> allItems = items.values().stream()
-				.sorted(Comparator.comparing(ShareItem::createdAt).reversed())
-				.toList();
+		List<ShareItem> allItems = repository.findAllByOrderByCreatedAtDesc().stream().map(ShareEntry::toItem).toList();
 		long messages = allItems.stream().filter(item -> item.type() == ShareType.MESSAGE).count();
 		long files = allItems.size() - messages;
 		long used = allItems.stream().mapToLong(ShareItem::size).sum();
 		return new ShareSnapshot(allItems, new ShareStats(allItems.size(), messages, files, used, storageLimit));
 	}
 
+	@Transactional(readOnly = true)
 	public List<ShareItem> findAll() {
 		return snapshot().items();
 	}
 
+	@Transactional
 	public synchronized ShareItem addMessage(String content) {
-		Instant now = Instant.now();
+		Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
 		ShareItem item = new ShareItem(
 				UUID.randomUUID(), ShareType.MESSAGE, content.strip(), null, null, 0,
 				now, now.plus(expirationHours, ChronoUnit.HOURS));
-		items.put(item.id(), item);
+		repository.save(new ShareEntry(item));
 		events.publishRefresh();
 		return item;
 	}
 
+	@Transactional(rollbackFor = IOException.class)
 	public synchronized ShareItem addFile(MultipartFile file) throws IOException {
 		if (file.isEmpty()) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请选择要上传的文件");
 		}
-		long used = items.values().stream().mapToLong(ShareItem::size).sum();
+		long used = repository.totalSize();
 		if (file.getSize() > storageLimit || used + file.getSize() > storageLimit) {
 			throw new ResponseStatusException(HttpStatus.INSUFFICIENT_STORAGE, "共享空间不足，请先删除部分文件");
 		}
@@ -89,15 +91,21 @@ public class ShareService {
 			throw exception;
 		}
 
-		Instant now = Instant.now();
+		Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
 		ShareItem item = new ShareItem(
 				id, ShareType.FILE, null, fileName, file.getContentType(), file.getSize(),
 				now, now.plus(expirationHours, ChronoUnit.HOURS));
-		items.put(id, item);
+		try {
+			repository.save(new ShareEntry(item));
+		} catch (RuntimeException exception) {
+			Files.deleteIfExists(target);
+			throw exception;
+		}
 		events.publishRefresh();
 		return item;
 	}
 
+	@Transactional(readOnly = true)
 	public StoredFile findFile(UUID id) {
 		ShareItem item = requireItem(id);
 		if (item.type() != ShareType.FILE) {
@@ -110,42 +118,41 @@ public class ShareService {
 		return new StoredFile(item, path);
 	}
 
+	@Transactional(rollbackFor = IOException.class)
 	public synchronized void delete(UUID id) throws IOException {
 		ShareItem item = requireItem(id);
 		deleteFile(item);
-		items.remove(id);
+		repository.deleteById(id);
 		events.publishRefresh();
 	}
 
+	@Transactional(rollbackFor = IOException.class)
 	public synchronized void clear() throws IOException {
-		for (ShareItem item : items.values()) {
+		for (ShareItem item : findAll()) {
 			deleteFile(item);
 		}
-		items.clear();
+		repository.deleteAllInBatch();
 		events.publishRefresh();
 	}
 
 	@Scheduled(fixedDelay = 60_000)
+	@Transactional(rollbackFor = IOException.class)
 	public synchronized void deleteExpired() throws IOException {
 		Instant now = Instant.now();
-		List<ShareItem> expired = items.values().stream()
-				.filter(item -> item.expiresAt().isBefore(now))
-				.toList();
+		List<ShareEntry> expiredEntries = repository.findAllByExpiresAtBefore(now);
+		List<ShareItem> expired = expiredEntries.stream().map(ShareEntry::toItem).toList();
 		for (ShareItem item : expired) {
 			deleteFile(item);
-			items.remove(item.id());
 		}
+		repository.deleteAllInBatch(expiredEntries);
 		if (!expired.isEmpty()) {
 			events.publishRefresh();
 		}
 	}
 
 	private ShareItem requireItem(UUID id) {
-		ShareItem item = items.get(id);
-		if (item == null) {
-			throw new ResponseStatusException(HttpStatus.NOT_FOUND, "共享内容不存在或已被删除");
-		}
-		return item;
+		return repository.findById(id).map(ShareEntry::toItem)
+				.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "共享内容不存在或已被删除"));
 	}
 
 	private void deleteFile(ShareItem item) throws IOException {

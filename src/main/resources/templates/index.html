@@ -33,17 +33,49 @@
         <nav class="main-nav" aria-label="主功能导航">
             <a href="#/share" data-nav="share" class="active">共享广场</a>
             <a href="#/tools" data-nav="tools">工具箱</a>
+            <a id="adminNav" href="#/admin" data-nav="admin" hidden>权限管理</a>
         </nav>
         <div class="telemetry" aria-hidden="true"><span>UPLINK / <b>LOCAL</b></span><span id="systemClock">00:00:00</span></div>
         <div class="connection"><span id="connectionDot"></span><strong id="connectionText">正在连接</strong><small>REALTIME SSE</small></div>
+        <button id="accountButton" class="account-button" type="button"><i></i><span>登录</span></button>
     </header>
 
     <div id="viewShare" class="view">
+    <section id="authGate" class="auth-gate" aria-live="polite">
+        <div class="auth-backdrop" aria-hidden="true"></div>
+        <form id="loginForm" class="auth-card glass">
+            <div class="auth-mark"><span>S</span><i></i></div>
+            <span class="kicker"><i></i> AUTHORIZED ACCESS ONLY</span>
+            <h2>登录共享节点</h2>
+            <p>共享广场仅向已授权账户开放，工具箱无需登录。</p>
+            <label><span>用户名</span><input id="loginUsername" name="username" autocomplete="username" maxlength="50" required></label>
+            <label><span>密码</span><input id="loginPassword" name="password" type="password" autocomplete="current-password" maxlength="128" required></label>
+            <p id="loginError" class="auth-error" role="alert"></p>
+            <button class="beam-button" type="submit"><span>验证并进入</span><i>→</i></button>
+            <a href="#/tools">无需登录，前往工具箱 →</a>
+        </form>
+
+        <form id="passwordForm" class="auth-card password-card" hidden>
+            <span class="kicker"><i></i> FIRST LOGIN SECURITY</span>
+            <h2>必须修改初始密码</h2>
+            <p>完成密码更新后才能访问共享内容。新密码不得包含用户名。</p>
+            <label><span>当前密码</span><input id="currentPassword" type="password" autocomplete="current-password" maxlength="128" required></label>
+            <label><span>新密码</span><input id="newPassword" type="password" autocomplete="new-password" maxlength="128" required></label>
+            <div id="passwordStrength" class="password-strength">
+                <span data-rule="length">至少 12 位</span><span data-rule="upper">大写字母</span><span data-rule="lower">小写字母</span>
+                <span data-rule="digit">数字</span><span data-rule="special">特殊字符</span><span data-rule="space">无空格</span>
+            </div>
+            <label><span>确认新密码</span><input id="confirmPassword" type="password" autocomplete="new-password" maxlength="128" required></label>
+            <p id="passwordError" class="auth-error" role="alert"></p>
+            <button class="beam-button" type="submit"><span>更新密码并继续</span><i>→</i></button>
+            <a href="#/tools">暂不修改，前往工具箱 →</a>
+        </form>
+    </section>
     <section class="hero">
         <div class="hero-copy">
-            <span class="kicker"><i></i> PRIVATE · FAST · DATABASE FREE</span>
+            <span class="kicker"><i></i> PRIVATE · FAST · ACCESS CONTROLLED</span>
             <h1><span data-text="让文件穿过">让文件穿过</span><br><em data-text="局域网。">局域网。</em></h1>
-            <p>消息、代码和文件在你的设备之间即时流动。没有云端，没有账号，数据只停留在这台主机。</p>
+            <p>消息、代码和文件在已授权设备之间即时流动。没有云端中转，数据与账户均由这台主机管理。</p>
         </div>
         <aside class="node-card glass">
             <div class="node-radar"><span></span><i></i><b></b></div>
@@ -65,6 +97,25 @@
     <div class="signal-ticker" aria-hidden="true">
         <div><span>ENCRYPTED LOCAL CHANNEL</span><i>◆</i><span>ZERO CLOUD RELAY</span><i>◆</i><span>REALTIME SIGNAL SYNC</span><i>◆</i><span>24H AUTO PURGE</span><i>◆</i><span>ENCRYPTED LOCAL CHANNEL</span><i>◆</i><span>ZERO CLOUD RELAY</span></div>
     </div>
+
+    <section class="device-heatmap glass" aria-labelledby="deviceHeatmapTitle">
+        <div class="heatmap-head">
+            <div><span class="index">NET</span><h2 id="deviceHeatmapTitle">在线设备热力图</h2></div>
+            <div class="device-total"><i></i><strong id="onlineDeviceCount">0</strong><span> 台在线</span></div>
+        </div>
+        <div class="heatmap-layout">
+            <div id="heatField" class="heat-field" role="img" aria-label="局域网在线设备分布">
+                <div class="heat-grid" aria-hidden="true"></div>
+                <div class="heat-core" aria-hidden="true"><span>S</span><i></i></div>
+                <div id="heatEmpty" class="heat-empty">正在扫描局域网信号…</div>
+            </div>
+            <div class="device-panel">
+                <div class="device-panel-label"><span>ACTIVE CLIENTS</span><span>信号强度</span></div>
+                <div id="deviceList" class="device-list" aria-live="polite"></div>
+            </div>
+        </div>
+        <div class="heat-legend"><span><i class="low"></i>单连接</span><span><i class="high"></i>多连接</span><small>热度表示该设备当前打开的连接数量</small></div>
+    </section>
 
     <section class="workspace">
         <section class="transmit glass" aria-labelledby="transmitTitle">
@@ -118,6 +169,63 @@
             <section class="tools-main" id="toolsBody"></section>
         </div>
     </div>
+
+    <div id="viewAdmin" class="view" hidden>
+        <section class="admin-hero">
+            <div>
+                <span class="kicker"><i></i> IDENTITY &amp; ACCESS CONTROL</span>
+                <h1>用户与权限<br><em>管理中心。</em></h1>
+                <p>通过角色统一分配权限，管理账户状态、登录锁定与初始密码。</p>
+            </div>
+            <div class="admin-metrics">
+                <article class="glass"><strong id="adminUserCount">0</strong><span>用户</span></article>
+                <article class="glass"><strong id="adminRoleCount">0</strong><span>角色</span></article>
+                <article class="glass"><strong id="adminPermissionCount">0</strong><span>权限</span></article>
+            </div>
+        </section>
+
+        <p id="adminDenied" class="admin-denied glass" hidden>当前账户没有用户或角色管理权限。</p>
+
+        <section id="userManagement" class="admin-section" hidden>
+            <div class="admin-section-head"><div><span class="index">USR</span><h2>用户管理</h2></div><button id="refreshAdmin" class="admin-button" type="button">刷新数据</button></div>
+            <div class="admin-layout">
+                <form id="createUserForm" class="admin-form glass">
+                    <h3>创建账户</h3><p>新账户首次登录时必须修改初始密码。</p>
+                    <label><span>用户名</span><input id="adminNewUsername" maxlength="50" pattern="[a-zA-Z0-9_.-]{3,50}" required></label>
+                    <label><span>初始密码</span><input id="adminNewPassword" type="password" maxlength="128" autocomplete="new-password" required></label>
+                    <fieldset id="newUserRoles"><legend>分配角色</legend><div class="admin-checks"></div></fieldset>
+                    <button class="beam-button" type="submit"><span>创建用户</span><i>＋</i></button>
+                </form>
+                <div class="admin-list-panel glass">
+                    <div class="admin-list-tools"><label><span>⌕</span><input id="adminUserSearch" type="search" placeholder="搜索用户名或角色"></label></div>
+                    <div id="adminUserList" class="admin-user-list" aria-live="polite"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="roleManagement" class="admin-section" hidden>
+            <div class="admin-section-head"><div><span class="index">RBAC</span><h2>角色与权限</h2></div></div>
+            <div class="admin-layout">
+                <form id="createRoleForm" class="admin-form glass">
+                    <h3>创建角色</h3><p>角色名保存后不可更改，权限可随时调整。</p>
+                    <label><span>角色名</span><input id="adminNewRoleName" maxlength="50" pattern="[A-Z][A-Z0-9_]{2,49}" placeholder="例如 AUDITOR" required></label>
+                    <label><span>说明</span><input id="adminNewRoleDescription" maxlength="100" required></label>
+                    <fieldset><legend>权限</legend><div id="newRolePermissions" class="admin-checks permission-checks"></div></fieldset>
+                    <button class="beam-button" type="submit"><span>创建角色</span><i>＋</i></button>
+                </form>
+                <div id="adminRoleList" class="admin-role-list" aria-live="polite"></div>
+            </div>
+        </section>
+    </div>
+
+    <dialog id="resetPasswordDialog" class="admin-dialog">
+        <form id="resetPasswordForm" method="dialog">
+            <span class="kicker"><i></i> CREDENTIAL RESET</span><h2>重置初始密码</h2>
+            <p>用户下次登录后必须立即修改此密码。</p>
+            <label><span>新初始密码</span><input id="resetPasswordValue" type="password" maxlength="128" autocomplete="new-password" required></label>
+            <div class="dialog-actions"><button value="cancel" class="admin-button" type="button">取消</button><button class="admin-button primary" type="submit">确认重置</button></div>
+        </form>
+    </dialog>
 
     <footer><span>SEEKER SHARE / LOCAL ONLY</span><span>内容将在 <strong>24 小时</strong>后自动销毁</span></footer>
 </main>

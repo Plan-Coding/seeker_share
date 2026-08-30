@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "启动 Seeker Share",
+            "request": "launch",
+            "mainClass": "com.seeker.share.SeekerShareApplication",
+            "projectName": "seeker-share",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "stopOnEntry": false,
+            "vmArgs": "-Dfile.encoding=UTF-8"
+        }
+    ]
+}

@@ -1,5 +1,9 @@
 const apiUrl = "/api/v1/shares";
-const state = {items: [], stats: null, clearProtected: false, address: window.location.origin};
+const state = {
+    items: [], stats: null, devices: [], auth: null, csrfToken: null,
+    protectedLoaded: false, address: window.location.origin,
+    admin: {users: [], roles: [], permissions: [], loaded: false}
+};
 const $ = (selector) => document.querySelector(selector);
 const messageForm = $("#messageForm");
 const messageInput = $("#messageInput");
@@ -10,6 +14,83 @@ const shareList = $("#shareList");
 const emptyState = $("#emptyState");
 const clearButton = $("#clearButton");
 const toast = $("#toast");
+const authGate = $("#authGate");
+const loginForm = $("#loginForm");
+const passwordForm = $("#passwordForm");
+let eventSource;
+
+loginForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    setAuthError("login", "");
+    const button = loginForm.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+        const response = await request("/api/v1/auth/login", {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({username: $("#loginUsername").value, password: $("#loginPassword").value})
+        });
+        applyAuth(response.data);
+        $("#loginPassword").value = "";
+        if (!state.auth.passwordChangeRequired) await startAuthorizedRoute();
+    } catch (error) {
+        setAuthError("login", error.message);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+passwordForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    setAuthError("password", "");
+    const button = passwordForm.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+        const response = await request("/api/v1/auth/change-password", {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                currentPassword: $("#currentPassword").value,
+                newPassword: $("#newPassword").value,
+                confirmation: $("#confirmPassword").value
+            })
+        });
+        applyAuth(response.data);
+        passwordForm.reset();
+        updatePasswordStrength();
+        showToast("密码已更新，欢迎进入共享节点");
+        await startAuthorizedRoute();
+    } catch (error) {
+        setAuthError("password", error.message);
+    } finally {
+        button.disabled = false;
+    }
+});
+
+$("#newPassword").addEventListener("input", updatePasswordStrength);
+$("#accountButton").addEventListener("click", async () => {
+    if (!state.auth?.authenticated) {
+        location.hash = "#/share";
+        renderAuth();
+        $("#loginUsername").focus();
+        return;
+    }
+    try {
+        await request("/api/v1/auth/logout", {method: "POST"});
+    } finally {
+        if (eventSource) eventSource.close();
+        eventSource = null;
+        state.protectedLoaded = false;
+        state.admin = {users: [], roles: [], permissions: [], loaded: false};
+        state.items = []; state.devices = []; state.stats = null;
+        try {
+            await loadAuth();
+        } catch {
+            state.auth = {authenticated: false, roles: [], permissions: [], passwordChangeRequired: false};
+            state.csrfToken = null;
+            renderAuth();
+        }
+        showToast("已安全退出");
+    }
+});
 
 messageInput.addEventListener("input", () => $("#characterCount").textContent = `${messageInput.value.length} / 5000`);
 messageInput.addEventListener("keydown", (event) => {
@@ -94,6 +175,7 @@ function uploadFile(file, onProgress) {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", `${apiUrl}/files`);
+        if (state.csrfToken) xhr.setRequestHeader("X-XSRF-TOKEN", state.csrfToken);
         xhr.upload.addEventListener("progress", event => {
             if (event.lengthComputable) onProgress(Math.round(event.loaded / event.total * 100));
         });
@@ -112,11 +194,11 @@ clearButton.addEventListener("click", async () => {
     if (!window.confirm("确定销毁全部消息和文件吗？此操作不可恢复。")) return;
     clearButton.disabled = true;
     try {
-        await request(apiUrl, {method: "DELETE", headers: adminHeaders()});
+        await request(apiUrl, {method: "DELETE"});
         showToast("全部共享内容已销毁");
         await loadShares();
     } catch (error) {
-        handleAdminError(error);
+        showToast(error.message, true);
     } finally {
         clearButton.disabled = state.items.length === 0;
     }
@@ -133,11 +215,11 @@ shareList.addEventListener("click", async (event) => {
     if (event.target.closest("[data-delete]")) {
         if (!window.confirm("删除这条共享内容？")) return;
         try {
-            await request(`${apiUrl}/${itemElement.dataset.id}`, {method: "DELETE", headers: adminHeaders()});
+            await request(`${apiUrl}/${itemElement.dataset.id}`, {method: "DELETE"});
             showToast("共享内容已删除");
             await loadShares();
         } catch (error) {
-            handleAdminError(error);
+            showToast(error.message, true);
         }
     }
 });
@@ -153,7 +235,6 @@ async function loadServerInfo() {
     try {
         const response = await request("/api/v1/server");
         const info = response.data;
-        state.clearProtected = info.clearProtected;
         state.address = info.accessUrls[0] || window.location.origin;
         $("#networkAddress").textContent = state.address;
         $("#hostName").textContent = info.hostName.toUpperCase();
@@ -172,6 +253,82 @@ async function loadShares() {
     } catch (error) {
         showToast(error.message, true);
     }
+}
+
+async function loadDevices() {
+    try {
+        const response = await request("/api/v1/devices");
+        state.devices = response.data;
+        renderDevices();
+    } catch (error) {
+        showToast(`设备扫描失败：${error.message}`, true);
+    }
+}
+
+function renderDevices() {
+    const heatField = $("#heatField");
+    const deviceList = $("#deviceList");
+    heatField.querySelectorAll(".heat-node").forEach(node => node.remove());
+    deviceList.replaceChildren(...state.devices.map(createDeviceRow));
+    $("#onlineDeviceCount").textContent = state.devices.length;
+    $("#heatEmpty").hidden = state.devices.length > 0;
+
+    state.devices.forEach((device, index) => {
+        const node = document.createElement("div");
+        const position = devicePosition(device.id, index, state.devices.length);
+        const intensity = Math.min(3, device.connectionCount);
+        node.className = `heat-node heat-${intensity}`;
+        node.style.setProperty("--x", `${position.x}%`);
+        node.style.setProperty("--y", `${position.y}%`);
+        node.style.setProperty("--delay", `${index * -0.45}s`);
+        node.setAttribute("aria-label", `${device.name}，${device.address}，${device.connectionCount} 个连接`);
+        node.innerHTML = `<i></i><b>${deviceTypeIcon(device.type)}</b><span></span>`;
+        const label = document.createElement("small");
+        label.textContent = device.address;
+        node.append(label);
+        heatField.append(node);
+    });
+}
+
+function createDeviceRow(device) {
+    const row = document.createElement("article");
+    row.className = "device-row";
+    const icon = document.createElement("span");
+    icon.className = `device-icon ${device.type.toLowerCase()}`;
+    icon.textContent = deviceTypeIcon(device.type);
+    const identity = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = device.name;
+    const address = document.createElement("small");
+    address.textContent = device.address;
+    identity.append(name, address);
+    const signal = document.createElement("div");
+    signal.className = "device-signal";
+    signal.title = `${device.connectionCount} 个实时连接`;
+    signal.append(...Array.from({length: 3}, (_, index) => {
+        const bar = document.createElement("i");
+        if (index < Math.min(3, device.connectionCount)) bar.className = "active";
+        return bar;
+    }));
+    const status = document.createElement("span");
+    status.className = "device-status";
+    status.textContent = device.connectionCount > 1 ? `${device.connectionCount} 连接` : "在线";
+    row.append(icon, identity, signal, status);
+    return row;
+}
+
+function devicePosition(id, index, total) {
+    let hash = 0;
+    for (const character of id) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+    const angle = (index / Math.max(total, 1)) * Math.PI * 2 + (hash % 31) / 31;
+    const radius = 25 + (hash % 18);
+    return {x: 50 + Math.cos(angle) * radius, y: 50 + Math.sin(angle) * radius * 0.72};
+}
+
+function deviceTypeIcon(type) {
+    if (type === "MOBILE") return "▯";
+    if (type === "TABLET") return "▭";
+    return "⌗";
 }
 
 function renderMetrics() {
@@ -255,10 +412,16 @@ function actionButton(label, action, className = "") {
 }
 
 function connectEvents() {
-    const source = new EventSource(`${apiUrl}/events`);
-    source.addEventListener("open", () => setConnection(true));
-    source.addEventListener("refresh", loadShares);
-    source.addEventListener("error", () => setConnection(false));
+    if (eventSource) return;
+    eventSource = new EventSource(`${apiUrl}/events`);
+    eventSource.addEventListener("open", () => {
+        setConnection(true);
+        loadDevices();
+    });
+    eventSource.addEventListener("refresh", loadShares);
+    eventSource.addEventListener("devices", loadDevices);
+    eventSource.addEventListener("heartbeat", loadDevices);
+    eventSource.addEventListener("error", () => setConnection(false));
 }
 
 function setConnection(connected) {
@@ -266,30 +429,414 @@ function setConnection(connected) {
     $("#connectionText").textContent = connected ? "实时在线" : "正在重连";
 }
 
-function adminHeaders() {
-    if (!state.clearProtected) return {};
-    let token = sessionStorage.getItem("seekerAdminToken");
-    if (!token) {
-        token = window.prompt("请输入管理员口令") || "";
-        if (token) sessionStorage.setItem("seekerAdminToken", token);
-    }
-    return {"X-Admin-Token": token};
-}
-
-function handleAdminError(error) {
-    if (error.status === 403) sessionStorage.removeItem("seekerAdminToken");
-    showToast(error.message, true);
-}
-
 async function request(url, options = {}) {
-    const response = await fetch(url, options);
+    const method = (options.method || "GET").toUpperCase();
+    const headers = new Headers(options.headers || {});
+    if (!["GET", "HEAD", "OPTIONS"].includes(method) && state.csrfToken) {
+        headers.set("X-XSRF-TOKEN", state.csrfToken);
+    }
+    const response = await fetch(url, {...options, headers});
     if (!response.ok) {
         const error = new Error(await responseError(response));
         error.status = response.status;
+        if (response.status === 401 && !url.endsWith("/login")) {
+            state.auth = {authenticated: false, roles: [], permissions: [], passwordChangeRequired: false};
+            state.protectedLoaded = false;
+            if (eventSource) eventSource.close();
+            eventSource = null;
+            state.csrfToken = null;
+            await loadAuth().catch(renderAuth);
+        }
         throw error;
     }
     return response.status === 204 ? null : response.json();
 }
+
+async function loadAuth() {
+    const response = await request("/api/v1/auth/me");
+    applyAuth(response.data);
+}
+
+function applyAuth(auth) {
+    state.auth = auth;
+    if (auth.csrfToken) state.csrfToken = auth.csrfToken;
+    renderAuth();
+}
+
+function renderAuth() {
+    const authenticated = Boolean(state.auth?.authenticated);
+    const changeRequired = authenticated && state.auth.passwordChangeRequired;
+    const toolsRoute = location.hash.startsWith("#/tools");
+    const authOpen = !toolsRoute && (!authenticated || changeRequired);
+    authGate.hidden = !authOpen;
+    document.documentElement.classList.toggle("auth-open", authOpen);
+    loginForm.hidden = authenticated;
+    passwordForm.hidden = !changeRequired;
+    const account = $("#accountButton");
+    account.classList.toggle("authenticated", authenticated);
+    account.querySelector("span").textContent = authenticated ? `${state.auth.username} · 退出` : "登录";
+    $("#adminNav").hidden = !authenticated || !hasAnyPermission("USER_MANAGE", "ROLE_MANAGE");
+    if (!authenticated) {
+        $("#connectionText").textContent = "等待登录";
+        $(".connection").classList.remove("connected");
+    }
+}
+
+async function startProtectedFeatures() {
+    if (!state.auth?.authenticated || state.auth.passwordChangeRequired) return;
+    if (!state.protectedLoaded) {
+        await Promise.all([loadShares(), loadDevices()]);
+        state.protectedLoaded = true;
+    }
+    connectEvents();
+    renderAuth();
+}
+
+function setAuthError(form, message) {
+    $(`#${form}Error`).textContent = message;
+}
+
+function updatePasswordStrength() {
+    const value = $("#newPassword").value;
+    const rules = {
+        length: value.length >= 12, upper: /[A-Z]/.test(value), lower: /[a-z]/.test(value),
+        digit: /\d/.test(value), special: /[^A-Za-z0-9\s]/.test(value), space: !/\s/.test(value)
+    };
+    $("#passwordStrength").querySelectorAll("[data-rule]").forEach(item =>
+        item.classList.toggle("valid", rules[item.dataset.rule]));
+}
+
+function syncAuthRoute() {
+    renderAuth();
+    startAuthorizedRoute();
+}
+
+async function startAuthorizedRoute() {
+    const root = location.hash.replace(/^#\/?/, "").split("/")[0] || "share";
+    if (root === "share") await startProtectedFeatures();
+    if (root === "admin") await loadAdminData();
+}
+
+function hasPermission(permission) {
+    return Boolean(state.auth?.permissions?.includes(permission));
+}
+
+function hasAnyPermission(...permissions) {
+    return permissions.some(hasPermission);
+}
+
+async function loadAdminData(force = false) {
+    const authenticated = state.auth?.authenticated && !state.auth.passwordChangeRequired;
+    const canManageUsers = hasPermission("USER_MANAGE");
+    const canManageRoles = hasPermission("ROLE_MANAGE");
+    $("#adminDenied").hidden = authenticated && (canManageUsers || canManageRoles);
+    $("#userManagement").hidden = !authenticated || !canManageUsers;
+    $("#roleManagement").hidden = !authenticated || !canManageRoles;
+    if (!authenticated || (!canManageUsers && !canManageRoles)) return;
+    if (state.admin.loaded && !force) {
+        renderAdmin();
+        return;
+    }
+    try {
+        const [usersResponse, rolesResponse, permissionsResponse] = await Promise.all([
+            canManageUsers ? request("/api/v1/admin/users") : Promise.resolve({data: []}),
+            canManageRoles ? request("/api/v1/admin/roles") : Promise.resolve({data: []}),
+            canManageRoles ? request("/api/v1/admin/permissions") : Promise.resolve({data: []})
+        ]);
+        state.admin = {
+            users: usersResponse.data,
+            roles: rolesResponse.data,
+            permissions: permissionsResponse.data,
+            loaded: true
+        };
+        renderAdmin();
+    } catch (error) {
+        showToast(`管理数据加载失败：${error.message}`, true);
+    }
+}
+
+function renderAdmin() {
+    $("#adminUserCount").textContent = state.admin.users.length;
+    $("#adminRoleCount").textContent = state.admin.roles.length;
+    $("#adminPermissionCount").textContent = state.admin.permissions.length;
+    renderNewUserRoles();
+    renderNewRolePermissions();
+    renderAdminUsers();
+    renderAdminRoles();
+}
+
+function renderNewUserRoles() {
+    const fieldset = $("#newUserRoles");
+    fieldset.hidden = !hasPermission("ROLE_MANAGE");
+    const target = fieldset.querySelector(".admin-checks");
+    target.replaceChildren(...state.admin.roles.map(role => adminCheck("new-user-role", role.name, role.name, role.name === "MEMBER")));
+}
+
+function renderNewRolePermissions() {
+    $("#newRolePermissions").replaceChildren(...state.admin.permissions.map(permission =>
+        adminCheck("new-role-permission", permission.code, permission.description, false, permission.code)));
+}
+
+function renderAdminUsers() {
+    const query = $("#adminUserSearch").value.trim().toLowerCase();
+    const users = state.admin.users.filter(user =>
+        `${user.username} ${user.roles.join(" ")}`.toLowerCase().includes(query));
+    $("#adminUserList").replaceChildren(...users.map(createAdminUser));
+}
+
+function createAdminUser(user) {
+    const current = user.username === state.auth.username;
+    const card = document.createElement("article");
+    card.className = "admin-user";
+    card.dataset.userId = user.id;
+
+    const identity = document.createElement("div");
+    identity.className = "admin-user-identity";
+    const title = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = user.username;
+    const status = document.createElement("span");
+    status.className = `status-chip ${!user.enabled || !user.accountNonLocked ? "danger" : ""}`;
+    status.textContent = !user.enabled ? "已停用" : !user.accountNonLocked ? "已锁定" : "正常";
+    title.append(name, status);
+    const details = document.createElement("small");
+    details.textContent = `创建 ${formatAdminDate(user.createdAt)} · 最近登录 ${formatAdminDate(user.lastLoginAt)}`;
+    identity.append(title, details);
+
+    const badges = document.createElement("div");
+    badges.className = "role-badges";
+    user.roles.forEach(role => {
+        const badge = document.createElement("span");
+        badge.textContent = role;
+        badges.append(badge);
+    });
+    if (user.passwordChangeRequired) {
+        const badge = document.createElement("span");
+        badge.className = "warning";
+        badge.textContent = "待改密码";
+        badges.append(badge);
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "admin-actions";
+    actions.append(
+        adminAction(user.enabled ? "停用" : "启用", "toggle-status", user.enabled ? "danger" : ""),
+        adminAction("解锁", "unlock", "", user.accountNonLocked),
+        adminAction("重置密码", "reset-password")
+    );
+    if (current) actions.querySelector('[data-action="toggle-status"]').disabled = true;
+
+    card.append(identity, badges, actions);
+    if (hasPermission("ROLE_MANAGE")) {
+        const editor = document.createElement("form");
+        editor.className = "user-role-editor";
+        editor.dataset.userId = user.id;
+        const checks = document.createElement("div");
+        checks.className = "admin-checks";
+        checks.append(...state.admin.roles.map(role =>
+            adminCheck(`user-role-${user.id}`, role.name, role.name, user.roles.includes(role.name))));
+        const save = document.createElement("button");
+        save.className = "admin-button primary";
+        save.type = "submit";
+        save.textContent = current ? "当前账户不可修改" : "保存角色";
+        save.disabled = current;
+        editor.append(checks, save);
+        card.append(editor);
+    }
+    return card;
+}
+
+function renderAdminRoles() {
+    $("#adminRoleList").replaceChildren(...state.admin.roles.map(role => {
+        const form = document.createElement("form");
+        form.className = "admin-role-card glass";
+        form.dataset.roleId = role.id;
+        const heading = document.createElement("div");
+        heading.className = "role-card-head";
+        const name = document.createElement("strong");
+        name.textContent = role.name;
+        const badge = document.createElement("span");
+        badge.textContent = role.builtIn ? "内置" : "自定义";
+        heading.append(name, badge);
+        const description = document.createElement("input");
+        description.className = "role-description";
+        description.maxLength = 100;
+        description.required = true;
+        description.value = role.description;
+        description.disabled = role.name === "ADMIN";
+        const checks = document.createElement("div");
+        checks.className = "admin-checks permission-checks";
+        checks.append(...state.admin.permissions.map(permission => {
+            const item = adminCheck(`permission-${role.id}`, permission.code, permission.description,
+                role.permissions.includes(permission.code), permission.code);
+            item.querySelector("input").disabled = role.name === "ADMIN";
+            return item;
+        }));
+        const actions = document.createElement("div");
+        actions.className = "admin-actions";
+        if (role.name !== "ADMIN") actions.append(adminAction("保存权限", "save-role", "primary"));
+        if (!role.builtIn) actions.append(adminAction("删除角色", "delete-role", "danger"));
+        form.append(heading, description, checks, actions);
+        return form;
+    }));
+}
+
+function adminCheck(group, value, label, checked, code = "") {
+    const wrapper = document.createElement("label");
+    wrapper.className = "admin-check";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.name = group;
+    input.value = value;
+    input.checked = checked;
+    const text = document.createElement("span");
+    const strong = document.createElement("strong");
+    strong.textContent = label;
+    text.append(strong);
+    if (code) {
+        const small = document.createElement("small");
+        small.textContent = code;
+        text.append(small);
+    }
+    wrapper.append(input, text);
+    return wrapper;
+}
+
+function adminAction(label, action, className = "", disabled = false) {
+    const button = document.createElement("button");
+    button.type = action === "save-role" ? "submit" : "button";
+    button.className = `admin-button ${className}`.trim();
+    button.dataset.action = action;
+    button.textContent = label;
+    button.disabled = disabled;
+    return button;
+}
+
+function checkedValues(root) {
+    return [...root.querySelectorAll('input[type="checkbox"]:checked')].map(input => input.value);
+}
+
+function formatAdminDate(value) {
+    return value ? new Intl.DateTimeFormat("zh-CN", {dateStyle: "short", timeStyle: "short"}).format(new Date(value)) : "从未";
+}
+
+$("#refreshAdmin").addEventListener("click", () => loadAdminData(true));
+$("#adminUserSearch").addEventListener("input", renderAdminUsers);
+
+$("#createUserForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+        const roles = hasPermission("ROLE_MANAGE") ? checkedValues($("#newUserRoles")) : [];
+        await request("/api/v1/admin/users", {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({username: $("#adminNewUsername").value, initialPassword: $("#adminNewPassword").value, roles})
+        });
+        event.currentTarget.reset();
+        showToast("用户已创建");
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+    finally { button.disabled = false; }
+});
+
+$("#createRoleForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type=submit]");
+    button.disabled = true;
+    try {
+        await request("/api/v1/admin/roles", {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                name: $("#adminNewRoleName").value.trim().toUpperCase(),
+                description: $("#adminNewRoleDescription").value,
+                permissions: checkedValues($("#newRolePermissions"))
+            })
+        });
+        event.currentTarget.reset();
+        showToast("角色已创建");
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+    finally { button.disabled = false; }
+});
+
+$("#adminUserList").addEventListener("submit", async event => {
+    const form = event.target.closest(".user-role-editor");
+    if (!form) return;
+    event.preventDefault();
+    try {
+        await request(`/api/v1/admin/users/${form.dataset.userId}/roles`, {
+            method: "PUT", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({roles: checkedValues(form)})
+        });
+        showToast("用户角色已更新");
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+});
+
+let resetPasswordUserId = null;
+$("#adminUserList").addEventListener("click", async event => {
+    const button = event.target.closest("[data-action]");
+    const card = event.target.closest(".admin-user");
+    if (!button || !card) return;
+    const user = state.admin.users.find(item => item.id === card.dataset.userId);
+    if (button.dataset.action === "reset-password") {
+        resetPasswordUserId = user.id;
+        $("#resetPasswordValue").value = "";
+        $("#resetPasswordDialog").showModal();
+        $("#resetPasswordValue").focus();
+        return;
+    }
+    try {
+        const body = button.dataset.action === "unlock" ? {unlock: true} : {enabled: !user.enabled, unlock: false};
+        await request(`/api/v1/admin/users/${user.id}/status`, {
+            method: "PATCH", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)
+        });
+        showToast(button.dataset.action === "unlock" ? "账户已解锁" : "账户状态已更新");
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+});
+
+$("#resetPasswordForm").addEventListener("submit", async event => {
+    event.preventDefault();
+    try {
+        await request(`/api/v1/admin/users/${resetPasswordUserId}/reset-password`, {
+            method: "POST", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({initialPassword: $("#resetPasswordValue").value})
+        });
+        $("#resetPasswordDialog").close();
+        showToast("初始密码已重置");
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+});
+$("#resetPasswordDialog .dialog-actions [value=cancel]").addEventListener("click", () => $("#resetPasswordDialog").close());
+
+$("#adminRoleList").addEventListener("submit", async event => {
+    const form = event.target.closest(".admin-role-card");
+    if (!form) return;
+    event.preventDefault();
+    try {
+        await request(`/api/v1/admin/roles/${form.dataset.roleId}`, {
+            method: "PUT", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({description: form.querySelector(".role-description").value, permissions: checkedValues(form)})
+        });
+        showToast("角色权限已更新");
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+});
+
+$("#adminRoleList").addEventListener("click", async event => {
+    const button = event.target.closest('[data-action="delete-role"]');
+    const form = event.target.closest(".admin-role-card");
+    if (!button || !form) return;
+    const role = state.admin.roles.find(item => item.id === form.dataset.roleId);
+    if (!window.confirm(`确定删除角色 ${role.name}？`)) return;
+    try {
+        await request(`/api/v1/admin/roles/${role.id}`, {method: "DELETE"});
+        showToast("角色已删除");
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+});
 
 async function responseError(response) {
     try {
@@ -420,6 +967,7 @@ function triggerTransmission() {
     window.setTimeout(() => document.body.classList.remove("transmitting"), 600);
 }
 
-Promise.all([loadServerInfo(), loadShares()]).then(connectEvents);
+Promise.all([loadServerInfo(), loadAuth()]).then(syncAuthRoute).catch(error => showToast(error.message, true));
+window.addEventListener("seeker:route", syncAuthRoute);
 startParticles();
 startInterfaceEffects();

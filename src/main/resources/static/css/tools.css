@@ -3,7 +3,7 @@
 .view[hidden] { display: none !important; }
 
 /* --- 顶栏导航 --- */
-.topbar { grid-template-columns: auto 1fr auto auto; }
+.topbar { grid-template-columns: auto auto 1fr auto auto; }
 .main-nav { display: flex; gap: .3rem; align-self: center; }
 .main-nav a { padding: .5rem .9rem; border: 1px solid transparent; color: #8f9aa4; font: 700 .66rem/1 ui-monospace, monospace; letter-spacing: .12em; text-decoration: none; transition: .2s; }
 .main-nav a:hover { color: var(--lime); }

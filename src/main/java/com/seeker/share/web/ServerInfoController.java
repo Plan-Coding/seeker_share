@@ -1,7 +1,6 @@
 package com.seeker.share.web;
 
 import com.seeker.share.common.ApiResponse;
-import com.seeker.share.share.AdminGuard;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
@@ -18,17 +17,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class ServerInfoController {
 
 	private final int port;
-	private final AdminGuard adminGuard;
 	private final Instant startedAt = Instant.now();
 
-	public ServerInfoController(@Value("${server.port}") int port, AdminGuard adminGuard) {
+	public ServerInfoController(@Value("${server.port}") int port) {
 		this.port = port;
-		this.adminGuard = adminGuard;
 	}
 
 	@GetMapping
 	public ApiResponse<ServerInfo> info() {
-		return ApiResponse.ok(new ServerInfo(hostName(), accessUrls(), adminGuard.isProtected(), startedAt));
+		return ApiResponse.ok(new ServerInfo(hostName(), accessUrls(), startedAt));
 	}
 
 	private List<String> accessUrls() {

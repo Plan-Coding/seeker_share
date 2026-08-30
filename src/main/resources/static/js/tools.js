@@ -1233,7 +1233,7 @@ const TOOLS = [
 const toolsBody = $("#toolsBody");
 const toolsMenu = $("#toolsMenu");
 const toolsSearch = $("#toolsSearch");
-const views = {share: $("#viewShare"), tools: $("#viewTools")};
+const views = {share: $("#viewShare"), tools: $("#viewTools"), admin: $("#viewAdmin")};
 let activeTimers = [];
 const every = (fn, ms) => { fn(); activeTimers.push(setInterval(fn, ms)); };
 const clearTimers = () => { activeTimers.forEach(clearInterval); activeTimers = []; };
@@ -1303,16 +1303,25 @@ function route() {
     if (root === "tools") {
         views.share.hidden = true;
         views.tools.hidden = false;
+        views.admin.hidden = true;
         setActiveNav("tools");
         const id = sub && TOOLS.some(t => t.id === sub) ? sub : null;
         renderMenu(toolsSearch.value);
         if (id) renderTool(id); else renderHome();
+    } else if (root === "admin") {
+        views.share.hidden = true;
+        views.tools.hidden = true;
+        views.admin.hidden = false;
+        setActiveNav("admin");
+        clearTimers();
     } else {
         views.share.hidden = false;
         views.tools.hidden = true;
+        views.admin.hidden = true;
         setActiveNav("share");
         clearTimers();
     }
+    window.dispatchEvent(new CustomEvent("seeker:route"));
 }
 
 toolsSearch.addEventListener("input", () => renderMenu(toolsSearch.value));

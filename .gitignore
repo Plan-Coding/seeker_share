@@ -4,6 +4,12 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+### Runtime data ###
+data/
+*.mv.db
+*.trace.db
+*.lock.db
+
 ### STS ###
 .apt_generated
 .classpath
@@ -14,7 +20,7 @@ target/
 .sts4-cache
 
 ### IntelliJ IDEA ###
-.idea
+.idea/
 *.iws
 *.iml
 *.ipr
@@ -30,4 +36,6 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/settings.json
