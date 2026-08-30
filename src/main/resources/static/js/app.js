@@ -7,6 +7,21 @@ const state = {
 const selectedUserIds = new Set();
 const adminPagers = { user: { current: 0 }, role: { current: 0 } };
 const PAGE_SIZE = 20;
+
+/* 主题切换 */
+const themeToggle = document.querySelector("#themeToggle");
+function applyTheme(theme) {
+    document.documentElement.dataset.theme = theme;
+    themeToggle.textContent = theme === "light" ? "☀" : "🌙";
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.content = theme === "light" ? "#eef1f4" : "#080a0f";
+    try { localStorage.setItem("seeker-theme", theme); } catch { /* ignore */ }
+}
+themeToggle.addEventListener("click", () => {
+    applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+});
+try { applyTheme(localStorage.getItem("seeker-theme") || "light"); }
+catch { applyTheme("light"); }
 const $ = (selector) => document.querySelector(selector);
 const messageForm = $("#messageForm");
 const messageInput = $("#messageInput");

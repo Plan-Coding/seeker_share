@@ -1,11 +1,16 @@
 <!doctype html>
-<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org">
+<html lang="zh-CN" xmlns:th="https://www.thymeleaf.org" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#080a0f">
+    <meta name="theme-color" content="#eef1f4">
     <meta name="description" content="Seeker Share 局域网文件与消息共享">
     <title th:text="${applicationName}">Seeker Share</title>
+    <script>
+        try {
+            document.documentElement.dataset.theme = localStorage.getItem("seeker-theme") || "light";
+        } catch (e) { /* 默认白色主题 */ }
+    </script>
     <link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
     <link rel="stylesheet" th:href="@{/css/tools.css}" href="/css/tools.css">
     <link rel="stylesheet" th:href="@{/vendor/highlight.github-dark.min.css}" href="/vendor/highlight.github-dark.min.css">
@@ -43,6 +48,7 @@
         </nav>
         <div class="telemetry" aria-hidden="true"><span>UPLINK / <b>LOCAL</b></span><span id="systemClock">00:00:00</span></div>
         <div class="connection"><span id="connectionDot"></span><strong id="connectionText">正在连接</strong><small>REALTIME SSE</small></div>
+        <button id="themeToggle" class="theme-button" type="button" title="切换主题" aria-label="切换主题">☀</button>
         <button id="accountButton" class="account-button" type="button"><i></i><span>登录</span></button>
     </header>
 
