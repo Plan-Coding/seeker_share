@@ -8,9 +8,13 @@
     <title th:text="${applicationName}">Seeker Share</title>
     <link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
     <link rel="stylesheet" th:href="@{/css/tools.css}" href="/css/tools.css">
+    <link rel="stylesheet" th:href="@{/vendor/highlight.github-dark.min.css}" href="/vendor/highlight.github-dark.min.css">
     <script th:src="@{/js/app.js}" src="/js/app.js" defer></script>
     <script th:src="@{/js/hanzi-data.js}" src="/js/hanzi-data.js" defer></script>
     <script th:src="@{/js/tools.js}" src="/js/tools.js" defer></script>
+    <script th:src="@{/vendor/markdown-it.min.js}" src="/vendor/markdown-it.min.js" defer></script>
+    <script th:src="@{/vendor/highlight.min.js}" src="/vendor/highlight.min.js" defer></script>
+    <script type="module" th:src="@{/js/docs.js}" src="/js/docs.js"></script>
 </head>
 <body>
 <div id="bootScreen" class="boot-screen" aria-hidden="true">
@@ -33,6 +37,7 @@
         </a>
         <nav class="main-nav" aria-label="主功能导航">
             <a href="#/share" data-nav="share" class="active">共享广场</a>
+            <a id="docsNav" href="#/docs" data-nav="docs" hidden>文档库</a>
             <a href="#/tools" data-nav="tools">工具箱</a>
             <a id="adminNav" href="#/admin" data-nav="admin" hidden>权限管理</a>
         </nav>
@@ -229,6 +234,10 @@
             <div class="dialog-actions"><button value="cancel" class="admin-button" type="button">取消</button><button class="admin-button primary" type="submit">确认重置</button></div>
         </form>
     </dialog>
+
+    <div id="viewDocs" class="view" hidden>
+        <section class="docs-main" id="docsBody" aria-label="文档库"></section>
+    </div>
 
     <footer><span>SEEKER SHARE / LOCAL ONLY</span><span>内容将在 <strong>24 小时</strong>后自动销毁</span></footer>
 </main>

@@ -173,6 +173,60 @@ select.tool-input { cursor: pointer; }
     .ziti-title { color: #444; }
 }
 
+/* --- 文档库 --- */
+.docs-main { padding: .2rem; display: grid; gap: 1rem; }
+.docs-head h2 { margin: 0; font-size: 1.5rem; }
+.docs-sub { margin: .4rem 0 0; color: var(--muted); font-size: .72rem; }
+.docs-toolbar { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.docs-toolbar .tool-back { margin: 0; }
+.docs-search { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 200px; padding: 0 .8rem; border: 1px solid var(--line); background: rgba(0,0,0,.2); }
+.docs-search span { color: var(--lime); }
+.docs-search input { flex: 1; min-width: 0; padding: .65rem 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .76rem; }
+.docs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: .6rem; }
+.docs-card { display: grid; gap: .4rem; padding: .95rem 1rem; border: 1px solid var(--line); background: var(--panel); color: inherit; text-decoration: none; transition: .2s; }
+.docs-card:hover { border-color: var(--line-hot); transform: translateY(-2px); box-shadow: 0 0 30px rgba(183,255,60,.07); }
+.docs-card-title { display: flex; align-items: center; gap: .5rem; }
+.docs-card-title strong { font-size: .85rem; }
+.docs-card small { color: var(--muted); font-size: .6rem; }
+.docs-badge { padding: .1rem .45rem; border: 1px solid rgba(66,232,255,.4); color: var(--cyan); font: 600 .55rem/1.5 ui-monospace, monospace; }
+.docs-tags { color: #6a7680; font-size: .62rem; overflow-wrap: anywhere; }
+.docs-empty { padding: 1.4rem; border: 1px dashed var(--line); color: var(--muted); font-size: .7rem; text-align: center; }
+
+.docs-editor { display: grid; gap: .8rem; }
+.doc-title-input { padding: .7rem .9rem; border: 1px solid var(--line); outline: 0; background: rgba(3,5,8,.48); color: var(--text); font: 650 1.05rem/1.4 ui-monospace, monospace; }
+.doc-title-input:focus { border-color: var(--line-hot); }
+.doc-meta { display: grid; grid-template-columns: minmax(200px, 1fr) 180px minmax(220px, 1.4fr); gap: .5rem; }
+.doc-split { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; align-items: start; }
+.doc-edit-wrap { min-width: 0; }
+.doc-textarea { width: 100%; min-height: 520px; padding: .9rem; border: 1px solid var(--line); outline: 0; background: rgba(3,5,8,.48); color: var(--text); font: .78rem/1.7 ui-monospace, monospace; resize: vertical; }
+.doc-textarea:focus { border-color: var(--line-hot); }
+.doc-preview { min-height: 520px; max-height: 80vh; overflow: auto; padding: 1.1rem 1.2rem; border: 1px solid var(--line); background: rgba(3,5,8,.48); color: #cfd8df; font: .82rem/1.85 -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif; overflow-wrap: anywhere; }
+.doc-preview h1, .doc-preview h2, .doc-preview h3 { color: #eef3f7; }
+.doc-preview a { color: var(--cyan); }
+.doc-preview img { max-width: 100%; }
+.doc-preview table { border-collapse: collapse; }
+.doc-preview td, .doc-preview th { border: 1px solid rgba(255,255,255,.12); padding: .3rem .6rem; }
+.doc-preview blockquote { margin: 0 0 .6rem; padding-left: .8rem; border-left: 3px solid rgba(66,232,255,.4); color: #8b96a0; }
+.doc-preview pre { overflow-x: auto; }
+.doc-code { padding: .7rem .9rem; border: 1px solid var(--line); background: #0d1117; border-radius: 6px; }
+.doc-collab-status { color: var(--muted); font-size: .62rem; }
+.doc-collab-status.ok { color: #c9f79a; }
+
+.docs-dialog { width: min(480px, 92vw); border: 1px solid var(--line-hot); background: #0c0f14; color: var(--text); padding: 1.2rem 1.4rem; }
+.docs-dialog::backdrop { background: rgba(0,0,0,.6); }
+.docs-dialog h3 { margin: 0 0 .8rem; }
+.docs-dialog-body { display: grid; gap: .4rem; max-height: 50vh; overflow: auto; margin-bottom: .8rem; }
+.docs-dialog .dialog-actions { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: flex-end; }
+.doc-upload-input { width: 100%; margin-bottom: .7rem; color: #9aa4ae; font-size: .7rem; }
+.doc-version-row, .doc-attach-row { display: grid; grid-template-columns: auto 1fr auto auto; gap: .7rem; align-items: center; padding: .5rem .7rem; border: 1px solid var(--line); font-size: .7rem; }
+.doc-version-row .muted, .doc-attach-row .muted { color: var(--muted); }
+
+@media (max-width: 900px) {
+    .doc-split { grid-template-columns: 1fr; }
+    .doc-meta { grid-template-columns: 1fr; }
+    .docs-card { grid-template-columns: 1fr; }
+}
+
 /* --- 响应式 --- */
 @media (max-width: 980px) {
     .tools-layout { grid-template-columns: 1fr; }

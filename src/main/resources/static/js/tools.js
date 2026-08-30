@@ -1502,7 +1502,7 @@ const TOOLS = [
 const toolsBody = $("#toolsBody");
 const toolsMenu = $("#toolsMenu");
 const toolsSearch = $("#toolsSearch");
-const views = {share: $("#viewShare"), tools: $("#viewTools"), admin: $("#viewAdmin")};
+const views = {share: $("#viewShare"), tools: $("#viewTools"), admin: $("#viewAdmin"), docs: $("#viewDocs")};
 let activeTimers = [];
 const every = (fn, ms) => { fn(); activeTimers.push(setInterval(fn, ms)); };
 const clearTimers = () => { activeTimers.forEach(clearInterval); activeTimers = []; };
@@ -1582,6 +1582,13 @@ function route() {
         views.tools.hidden = true;
         views.admin.hidden = false;
         setActiveNav("admin");
+        clearTimers();
+    } else if (root === "docs") {
+        views.share.hidden = true;
+        views.tools.hidden = true;
+        views.admin.hidden = true;
+        views.docs.hidden = false;
+        setActiveNav("docs");
         clearTimers();
     } else {
         views.share.hidden = false;

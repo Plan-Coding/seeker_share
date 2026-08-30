@@ -38,6 +38,19 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 - 初始账户首次登录必须修改密码，包含密码强度检查与登录失败锁定
 - 响应式赛博终端界面，适配桌面端和移动端
 
+### 文档库
+
+顶部导航切换到「文档库」，局域网内长期沉淀的 **Markdown 知识库**，支持**多人实时协同编辑**：
+
+- Markdown 文档的创建、编辑、分类、标签与关键词搜索（标题/正文/标签）
+- **Yjs CRDT 实时协同**：多设备同时编辑同一文档自动合并，经 Spring WebSocket 中继，无需 Node 服务
+- 编辑器与预览分屏，代码块语法高亮（highlight.js）
+- **版本历史**：保存/发布可生成快照，一键回滚
+- 支持嵌入图片与附件（本地目录存储），可插入 Markdown 链接
+- 导出 Markdown / HTML / PDF（浏览器打印）
+- 复用 RBAC 权限：`DOCUMENT_READ / WRITE / MANAGE`，管理员与成员角色已内置
+- 前端库（Yjs、markdown-it、highlight.js）**自托管**于 `static/vendor/`，局域网运行不依赖外网 / CDN
+
 ### 运维工具箱
 
 顶部导航切换到「工具箱」，26 个常用小工具**全部在浏览器本地运行，零后端依赖，数据不出本机**：
@@ -78,8 +91,9 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 - Thymeleaf
 - Jakarta Validation
 - Server-Sent Events（SSE）
+- Spring WebSocket（文档库实时协同中继）
 - Spring Boot Actuator
-- 原生 JavaScript / CSS3（工具箱零第三方依赖）
+- 原生 JavaScript / CSS3（工具箱零第三方依赖；文档库使用自托管 Yjs / markdown-it / highlight.js）
 - Maven Wrapper
 
 ## 快速开始
@@ -158,11 +172,13 @@ src/main/java/com/seeker/share/
 ├── common/       # 通用 API 响应
 ├── security/     # 用户、角色、权限、认证与安全配置
 ├── share/        # 分享模型、存储、清理和实时事件服务
+├── document/     # 文档库：实体、服务、WebSocket 协同中继、附件
 └── web/          # 页面与 REST 控制器
 src/main/resources/
 ├── static/
-│   ├── css/      # app.css 共享界面 · tools.css 工具箱界面
-│   └── js/       # app.js 共享逻辑 · tools.js 工具箱（纯前端）· hanzi-data.js 汉字拼音/笔画数据
+│   ├── css/      # app.css 共享界面 · tools.css 工具箱/文档库界面
+│   ├── js/       # app.js 共享逻辑 · tools.js 工具箱 · docs.js 文档库 · hanzi-data.js 汉字数据
+│   └── vendor/   # 自托管第三方前端库（yjs + lib0 / markdown-it / highlight.js）
 └── templates/    # Thymeleaf 页面模板
 AGENTS.md         # AI 代理项目指令（约定、命令、质量门槛）
 .agents/skills/   # Agent Skills 技能目录（分层组织，见其 README）

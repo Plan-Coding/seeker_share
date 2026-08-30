@@ -56,7 +56,8 @@ public class SecurityDataInitializer implements ApplicationRunner {
 		memberRole.getPermissions().clear();
 		memberRole.getPermissions().addAll(permissions.findAllById(java.util.List.of(
 				PermissionCode.SHARE_READ, PermissionCode.SHARE_CREATE,
-				PermissionCode.SHARE_DOWNLOAD, PermissionCode.DEVICE_READ)));
+				PermissionCode.SHARE_DOWNLOAD, PermissionCode.DEVICE_READ,
+				PermissionCode.DOCUMENT_READ, PermissionCode.DOCUMENT_WRITE)));
 		roles.save(memberRole);
 
 		if (!users.existsByUsernameIgnoreCase(adminUsername)) {
@@ -75,6 +76,9 @@ public class SecurityDataInitializer implements ApplicationRunner {
 		values.put(PermissionCode.SHARE_DELETE, "删除单条共享内容");
 		values.put(PermissionCode.SHARE_CLEAR, "清空全部共享内容");
 		values.put(PermissionCode.DEVICE_READ, "查看在线设备");
+		values.put(PermissionCode.DOCUMENT_READ, "查看文档库");
+		values.put(PermissionCode.DOCUMENT_WRITE, "创建与编辑文档");
+		values.put(PermissionCode.DOCUMENT_MANAGE, "删除文档与附件");
 		values.put(PermissionCode.USER_MANAGE, "管理用户账户");
 		values.put(PermissionCode.ROLE_MANAGE, "管理角色与权限");
 		return values;
