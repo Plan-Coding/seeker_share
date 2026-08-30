@@ -56,7 +56,7 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 
 ## AI Coding 声明
 
-本项目包含 **AI Coding**：项目架构、功能实现、界面设计、测试和文档维护均有 AI 参与。
+本项目包含 **AI Coding**：项目架构、功能实现、界面设计、测试和文档维护均有 AI 参与。AI 的使用方式、工程约定、质量保障流程与贡献记录详见 [docs/AI_CODING.md](docs/AI_CODING.md)。
 
 如果你在使用中遇到 Bug、兼容性问题，或有新的功能建议，请前往 [GitHub Issues](https://github.com/Plan-Coding/seeker_share/issues) 提交反馈。Issue 将通过 AI 辅助分析、修复和完善，并在提交前进行必要的代码检查与测试。
 
