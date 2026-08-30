@@ -367,6 +367,508 @@ function splitWords(text) {
         .filter(Boolean);
 }
 
+/* ---- YAML / Properties 互转 ---- */
+function parseYaml(text) {
+    const lines = text.split(/\r?\n/).map(l => l.replace(/\t/g, "  "));
+    const n = lines.length;
+    let i = 0;
+    const indent = (s) => s.length - s.trimStart().length;
+    function skipNoise() {
+        while (i < n) {
+            const t = lines[i].trim();
+            if (t === "" || t.startsWith("#")) i++;
+            else break;
+        }
+    }
+    function parseScalar(raw) {
+        let s = raw.trim();
+        if (s === "" || s.startsWith("#")) return null;
+        if (s.length >= 2 && s[0] === '"' && s.endsWith('"')) {
+            return s.slice(1, -1).replace(/\\"/g, '"').replace(/\\n/g, "\n").replace(/\\t/g, "\t").replace(/\\\\/g, "\\");
+        }
+        if (s.length >= 2 && s[0] === "'" && s.endsWith("'")) return s.slice(1, -1).replace(/''/g, "'");
+        const ci = s.indexOf(" #");
+        if (ci >= 0) s = s.slice(0, ci).trim();
+        if (s[0] === "[" && s.endsWith("]")) return parseFlow(s);
+        if (s[0] === "{" && s.endsWith("}")) return parseFlow(s);
+        if (s === "null" || s === "~") return null;
+        if (s === "true") return true;
+        if (s === "false") return false;
+        if (/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(s)) return Number(s);
+        return s;
+    }
+    function parseFlow(txt) {
+        let pos = 0;
+        const len = txt.length;
+        function skip() { while (pos < len && /\s/.test(txt[pos])) pos++; }
+        function parseValue() {
+            skip();
+            if (pos >= len) return null;
+            const ch = txt[pos];
+            if (ch === "[") return parseArray();
+            if (ch === "{") return parseObject();
+            if (ch === '"' || ch === "'") {
+                const quote = ch;
+                pos++;
+                let s = "";
+                while (pos < len && txt[pos] !== quote) { if (txt[pos] === "\\" && quote === '"' && pos + 1 < len) { s += txt[pos + 1]; pos += 2; } else { s += txt[pos]; pos++; } }
+                pos++;
+                return s;
+            }
+            let start = pos;
+            while (pos < len && !",]}".includes(txt[pos])) pos++;
+            const raw = txt.slice(start, pos).trim();
+            return parseScalar(raw);
+        }
+        function parseArray() {
+            pos++; // consume [
+            const arr = [];
+            skip();
+            if (txt[pos] === "]") { pos++; return arr; }
+            while (pos < len) {
+                arr.push(parseValue());
+                skip();
+                if (txt[pos] === ",") { pos++; continue; }
+                if (txt[pos] === "]") { pos++; break; }
+                pos++;
+            }
+            return arr;
+        }
+    function parseObject() {
+        pos++; // consume {
+        const obj = {};
+        skip();
+        if (txt[pos] === "}") { pos++; return obj; }
+        while (pos < len) {
+            let key;
+            skip();
+            const ch = txt[pos];
+            if (ch === '"' || ch === "'") {
+                key = parseValue();
+            } else {
+                const start = pos;
+                while (pos < len && !":,}".includes(txt[pos])) pos++;
+                key = txt.slice(start, pos).trim();
+            }
+            skip();
+            if (txt[pos] === ":") pos++;
+            obj[String(key)] = parseValue();
+            skip();
+            if (txt[pos] === ",") { pos++; continue; }
+            if (txt[pos] === "}") { pos++; break; }
+            pos++;
+        }
+        return obj;
+    }
+        return parseValue();
+    }
+    function unquoteKey(k) {
+        if (k.length >= 2 && ((k[0] === '"' && k.endsWith('"')) || (k[0] === "'" && k.endsWith("'")))) return k.slice(1, -1);
+        return k;
+    }
+    function parseMap(minIndent) {
+        const map = {};
+        while (true) {
+            skipNoise();
+            if (i >= n) break;
+            const line = lines[i];
+            const ind = indent(line);
+            if (ind < minIndent) break;
+            if (ind > minIndent) break;
+            const t = line.trim();
+            if (t === "") continue;
+            if (t.startsWith("-")) break;
+            const ci = t.indexOf(":");
+            if (ci === -1) throw new Error(`YAML 语法错误：缺少冒号 "${line}"`);
+            const key = unquoteKey(t.slice(0, ci).trim());
+            const rest = t.slice(ci + 1).trim();
+            if (rest === "" || rest.startsWith("#")) {
+                i++;
+                skipNoise();
+                if (i < n && indent(lines[i]) > ind) map[key] = parseNode(indent(lines[i])).value;
+                else map[key] = null;
+            } else {
+                map[key] = parseScalar(rest);
+                i++;
+            }
+        }
+        return map;
+    }
+    function parseSeq(minIndent) {
+        const arr = [];
+        while (true) {
+            skipNoise();
+            if (i >= n) break;
+            const line = lines[i];
+            const ind = indent(line);
+            if (ind < minIndent) break;
+            const t = line.trim();
+            if (!t.startsWith("-") || t.startsWith("--")) break;
+            const rest = t.slice(1).trim();
+            if (rest === "" || rest.startsWith("#")) {
+                i++;
+                skipNoise();
+                if (i < n && indent(lines[i]) > ind) arr.push(parseNode(indent(lines[i])).value);
+                else arr.push(null);
+            } else if (rest.includes(":")) {
+                const ci = rest.indexOf(":");
+                const key = unquoteKey(rest.slice(0, ci).trim());
+                const vpart = rest.slice(ci + 1).trim();
+                const itemMap = {};
+                if (vpart === "" || vpart.startsWith("#")) {
+                    i++;
+                    skipNoise();
+                    if (i < n && indent(lines[i]) > ind) itemMap[key] = parseNode(indent(lines[i])).value;
+                    else itemMap[key] = null;
+                } else {
+                    itemMap[key] = parseScalar(vpart);
+                    i++;
+                }
+                while (i < n) {
+                    skipNoise();
+                    if (i >= n) break;
+                    const l2 = lines[i]; const i2 = indent(l2);
+                    if (i2 <= ind) break;
+                    const t2 = l2.trim();
+                    if (t2.startsWith("-")) break;
+                    const c2 = t2.indexOf(":");
+                    if (c2 === -1) throw new Error(`YAML 语法错误：${l2}`);
+                    const k2 = unquoteKey(t2.slice(0, c2).trim());
+                    const v2 = t2.slice(c2 + 1).trim();
+                    if (v2 === "" || v2.startsWith("#")) {
+                        i++;
+                        skipNoise();
+                        if (i < n && indent(lines[i]) > i2) itemMap[k2] = parseNode(indent(lines[i])).value;
+                        else itemMap[k2] = null;
+                    } else { itemMap[k2] = parseScalar(v2); i++; }
+                }
+                arr.push(itemMap);
+            } else {
+                arr.push(parseScalar(rest));
+                i++;
+            }
+        }
+        return arr;
+    }
+    function parseNode(minIndent) {
+        skipNoise();
+        if (i >= n) return {done: true, value: null};
+        const line = lines[i];
+        const ind = indent(line);
+        if (ind < minIndent) return {done: false, value: undefined};
+        const t = line.trim();
+        if (t.startsWith("-")) return {done: true, value: parseSeq(ind)};
+        if (t.includes(":")) return {done: true, value: parseMap(ind)};
+        const v = parseScalar(t);
+        i++;
+        return {done: true, value: v};
+    }
+    skipNoise();
+    if (i >= n) return null;
+    const node = parseNode(0);
+    return node.done ? node.value : null;
+}
+
+/* ---- Properties 解析 ---- */
+function splitEntry(line) {
+    let sep = -1;
+    let escaped = false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (escaped) { escaped = false; continue; }
+        if (c === "\\") { escaped = true; continue; }
+        if (c === "=" || c === ":" || c === " " || c === "\t") { sep = i; break; }
+    }
+    if (sep === -1) return [line, ""];
+    return [line.slice(0, sep), line.slice(sep + 1).replace(/^\s+/, "")];
+}
+function unescapeProperties(s) {
+    return s.replace(/\\(u[0-9a-fA-F]{4}|[0-9a-fA-F]{1,4}|.)/g, (m, p) => {
+        if (p[0] === "u" || /^[0-9a-fA-F]{1,4}$/.test(p)) return String.fromCharCode(parseInt(p.replace(/^u/, ""), 16));
+        switch (p) { case "t": return "\t"; case "n": return "\n"; case "r": return "\r"; case "f": return "\f"; default: return p; }
+    });
+}
+function parseProperties(text) {
+    const rawLines = text.split(/\r?\n/);
+    const logical = [];
+    let buf = "";
+    for (const line of rawLines) {
+        const trimmed = line.trim();
+        if (buf === "" && (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith("!"))) continue;
+        buf += line;
+        let bs = 0;
+        for (let k = buf.length - 1; k >= 0 && buf[k] === "\\"; k--) bs++;
+        if (bs % 2 === 1) { buf = buf.slice(0, -1); continue; }
+        logical.push(buf);
+        buf = "";
+    }
+    if (buf) logical.push(buf);
+    const root = {};
+    for (const entry of logical) {
+        const [rawKey, rawValue] = splitEntry(entry);
+        const key = unescapeProperties(rawKey);
+        const value = unescapeProperties(rawValue);
+        const segments = parseKeyPath(key);
+        setPath(root, segments, value);
+    }
+    return root;
+}
+function parseKeyPath(key) {
+    const segments = [];
+    let cur = "";
+    for (let i = 0; i < key.length; i++) {
+        const c = key[i];
+        if (c === "[") {
+            const end = key.indexOf("]", i);
+            const idx = key.slice(i + 1, end);
+            if (cur) { segments.push(cur); cur = ""; }
+            segments.push([Number(idx)]);
+            i = end;
+        } else if (c === ".") {
+            if (cur) segments.push(cur);
+            cur = "";
+        } else cur += c;
+    }
+    if (cur) segments.push(cur);
+    return segments;
+}
+function setPath(root, segments, value) {
+    let node = root;
+    for (let i = 0; i < segments.length - 1; i++) {
+        const seg = segments[i];
+        const nextIsArray = Array.isArray(segments[i + 1]);
+        if (Array.isArray(seg)) {
+            const idx = seg[0];
+            if (!Array.isArray(node)) throw new Error(`键路径冲突：${segments.join(".")}`);
+            if (!(idx in node)) node[idx] = nextIsArray ? [] : {};
+            node = node[idx];
+        } else {
+            if (typeof node !== "object" || node === null || Array.isArray(node)) throw new Error(`键路径冲突：${segments.join(".")}`);
+            if (!(seg in node)) node[seg] = nextIsArray ? [] : {};
+            node = node[seg];
+        }
+    }
+    const last = segments[segments.length - 1];
+    if (Array.isArray(last)) {
+        if (!Array.isArray(node)) throw new Error(`键路径冲突：${segments.join(".")}`);
+        node[last[0]] = value;
+    } else {
+        if (typeof node !== "object" || node === null || Array.isArray(node)) throw new Error(`键路径冲突：${segments.join(".")}`);
+        node[last] = value;
+    }
+    return root;
+}
+
+/* ---- YAML 序列化 ---- */
+function yamlScalar(v) {
+    if (v === null || v === undefined) return "null";
+    if (typeof v === "boolean") return v ? "true" : "false";
+    if (typeof v === "number") return String(v);
+    const s = String(v);
+    if (s === "") return '""';
+    if (/[:#\[\]{},&*!|>'"%@`]/.test(s) || /^\s|\s$/.test(s) || /^[-0-9?]/.test(s) || /^[^A-Za-z_\/.\-\u4e00-\u9fa5]/.test(s)) {
+        return JSON.stringify(s);
+    }
+    return s;
+}
+function yamlKey(k) {
+    if (/^[A-Za-z_][A-Za-z0-9_.\-]*$/.test(k)) return k;
+    return JSON.stringify(k);
+}
+function toYaml(value) {
+    const lines = [];
+    const emitKeyVal = (key, val, depth) => {
+        const pad = "  ".repeat(depth);
+        const obj = val && typeof val === "object";
+        if (obj && !Array.isArray(val) && Object.keys(val).length === 0) { lines.push(`${pad}${yamlKey(key)}: {}`); return; }
+        if (obj && Array.isArray(val) && val.length === 0) { lines.push(`${pad}${yamlKey(key)}: []`); return; }
+        if (obj) { lines.push(`${pad}${yamlKey(key)}:`); emit(val, depth + 1); }
+        else lines.push(`${pad}${yamlKey(key)}: ${yamlScalar(val)}`);
+    };
+    const emit = (node, depth) => {
+        const pad = "  ".repeat(depth);
+        if (Array.isArray(node)) {
+            for (const item of node) {
+                const isMap = item && typeof item === "object" && !Array.isArray(item);
+                const isEmptyMap = isMap && Object.keys(item).length === 0;
+                if (isMap && !isEmptyMap) {
+                    const keys = Object.keys(item);
+                    const first = keys[0];
+                    emitKeyVal(first, item[first], depth);
+                    lines[lines.length - 1] = `${pad}- ` + lines[lines.length - 1].slice(pad.length);
+                    for (let k = 1; k < keys.length; k++) emitKeyVal(keys[k], item[keys[k]], depth + 1);
+                } else if (isEmptyMap) {
+                    lines.push(`${pad}- {}`);
+                } else if (item && typeof item === "object") {
+                    lines.push(`${pad}-`);
+                    emit(item, depth + 1);
+                } else {
+                    lines.push(`${pad}- ${yamlScalar(item)}`);
+                }
+            }
+        } else if (node && typeof node === "object") {
+            for (const key of Object.keys(node)) emitKeyVal(key, node[key], depth);
+        } else {
+            lines.push(pad + yamlScalar(node));
+        }
+    };
+    emit(value, 0);
+    return lines.join("\n");
+}
+function escapePropKey(k) {
+    return k.replace(/\\/g, "\\\\").replace(/([=:#])/g, "\\$1").replace(/^(\s)/, "\\$1").replace(/(\s)$/, "\\$1");
+}
+function escapePropValue(v) {
+    const s = v === null || v === undefined ? "" : String(v);
+    return s.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\t/g, "\\t").replace(/\r/g, "\\r").replace(/\f/g, "\\f").replace(/^(\s)/, "\\$1").replace(/(\s)$/, "\\$1");
+}
+function yamlToProperties(text) {
+    const value = parseYaml(text);
+    const entries = [];
+    const visit = (node, prefix) => {
+        if (Array.isArray(node)) node.forEach((item, idx) => visit(item, `${prefix}[${idx}]`));
+        else if (node && typeof node === "object") {
+            for (const key of Object.keys(node)) visit(node[key], prefix ? `${prefix}.${key}` : key);
+        } else entries.push([prefix || "root", node]);
+    };
+    visit(value, "");
+    return entries.map(([k, v]) => `${escapePropKey(k)}=${escapePropValue(v)}`).join("\n");
+}
+function propertiesToYaml(text) {
+    return toYaml(parseProperties(text));
+}
+
+/* ---- XML 格式化 ---- */
+function tokenizeXml(text) {
+    const tokens = [];
+    let i = 0;
+    const n = text.length;
+    while (i < n) {
+        const lt = text.indexOf("<", i);
+        if (lt === -1) {
+            if (text.slice(i).trim()) tokens.push({type: "text", value: text.slice(i)});
+            break;
+        }
+        if (lt > i) tokens.push({type: "text", value: text.slice(i, lt)});
+        if (text.startsWith("<!--", lt)) { const end = text.indexOf("-->", lt); if (end < 0) throw new Error("注释未闭合"); tokens.push({type: "comment", value: text.slice(lt, end + 3)}); i = end + 3; }
+        else if (text.startsWith("<![CDATA[", lt)) { const end = text.indexOf("]]>", lt); if (end < 0) throw new Error("CDATA 未闭合"); tokens.push({type: "cdata", value: text.slice(lt, end + 3)}); i = end + 3; }
+        else if (text.startsWith("<?", lt)) { const end = text.indexOf("?>", lt); if (end < 0) throw new Error("处理指令未闭合"); tokens.push({type: "pi", value: text.slice(lt, end + 2)}); i = end + 2; }
+        else if (/^<!doctype/i.test(text.slice(lt, lt + 10))) { const end = text.indexOf(">", lt); if (end < 0) throw new Error("DOCTYPE 未闭合"); tokens.push({type: "doctype", value: text.slice(lt, end + 1)}); i = end + 1; }
+        else {
+            let end = lt + 1, inQuote = null;
+            while (end < n) {
+                const c = text[end];
+                if (inQuote) { if (c === inQuote) inQuote = null; }
+                else if (c === '"' || c === "'") inQuote = c;
+                else if (c === ">") break;
+                end++;
+            }
+            if (end >= n) throw new Error("标签未闭合");
+            tokens.push({type: "tag", value: text.slice(lt, end + 1)});
+            i = end + 1;
+        }
+    }
+    return tokens;
+}
+function parseAttrs(tag) {
+    const attrs = [];
+    const content = tag.replace(/^<\s*[A-Za-z_][\w:.-]*/, "").replace(/\/?>$/, "").trim();
+    const re = /([A-Za-z_:][\w:.-]*)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/g;
+    let m;
+    while ((m = re.exec(content))) attrs.push([m[1], m[2].replace(/^['"]|['"]$/g, "")]);
+    return attrs;
+}
+function buildTree(tokens) {
+    const root = {type: "root", children: []};
+    const stack = [root];
+    for (const t of tokens) {
+        const top = stack[stack.length - 1];
+        if (t.type === "text") { if (t.value) top.children.push({type: "text", value: t.value}); }
+        else if (t.type === "tag") {
+            if (/^<\/\s*/.test(t.value)) {
+                const name = t.value.match(/^<\/\s*([A-Za-z_][\w:.-]*)/)[1];
+                if (stack.length <= 1) throw new Error(`多余的闭合标签 </${name}>`);
+                const open = stack[stack.length - 1];
+                if (open.type !== "element" || open.name !== name) throw new Error(`标签不匹配：</${name}> 应为 </${open.name}>`);
+                stack.pop();
+            } else {
+                const name = t.value.match(/^<\s*([A-Za-z_][\w:.-]*)/)[1];
+                const selfClosing = /\/\s*>$/.test(t.value.trim());
+                const elem = {type: "element", name, attrs: parseAttrs(t.value), selfClosing, children: []};
+                top.children.push(elem);
+                if (!selfClosing) stack.push(elem);
+            }
+        } else {
+            top.children.push({type: t.type, value: t.value});
+        }
+    }
+    if (stack.length > 1) throw new Error("XML 缺少闭合标签");
+    return root;
+}
+function attrsString(attrs) {
+    return attrs.length ? " " + attrs.map(([k, v]) => `${k}="${v.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"`).join(" ") : "";
+}
+const isWsOnly = (s) => s.trim() === "";
+function serializeNode(node, depth, unit) {
+    if (node.type === "root") {
+        return node.children
+            .filter(c => !(c.type === "text" && isWsOnly(c.value)))
+            .map(c => serializeNode(c, depth, unit)).join("");
+    }
+    const pad = unit.repeat(depth);
+    if (node.type === "comment" || node.type === "cdata" || node.type === "pi") return pad + node.value + "\n";
+    if (node.type === "doctype") return node.value + "\n";
+    if (node.type === "text") return node.value;
+    const open = "<" + node.name + attrsString(node.attrs) + (node.selfClosing ? "/>" : ">");
+    if (node.selfClosing) return pad + open + "\n";
+    if (node.children.length === 0) return pad + open + "</" + node.name + ">\n";
+    const hasText = node.children.some(c => c.type === "text" && !isWsOnly(c.value));
+    if (hasText) {
+        let inner = "";
+        for (const c of node.children) {
+            if (c.type === "text") inner += c.value;
+            else inner += inlineNode(c);
+        }
+        return pad + open + inner + "</" + node.name + ">\n";
+    }
+    let out = pad + open + "\n";
+    for (const c of node.children) {
+        if (c.type === "text" && isWsOnly(c.value)) continue;
+        out += serializeNode(c, depth + 1, unit);
+    }
+    return out + pad + "</" + node.name + ">\n";
+}
+function inlineNode(c) {
+    if (c.type === "comment" || c.type === "cdata" || c.type === "pi") return c.value;
+    if (c.type === "text") return c.value;
+    const open = "<" + c.name + attrsString(c.attrs) + (c.selfClosing ? "/>" : ">");
+    if (c.selfClosing) return open;
+    if (c.children.length === 0) return open + "</" + c.name + ">";
+    return open + c.children.map(inlineNode).join("") + "</" + c.name + ">";
+}
+function formatXml(text, unit = "  ") {
+    return serializeNode(buildTree(tokenizeXml(text)), 0, unit).replace(/\n+$/, "\n");
+}
+function minifyXml(text) {
+    const root = buildTree(tokenizeXml(text));
+    const strip = (node) => {
+        if (node.type === "element" || node.type === "root") {
+            node.children = node.children.filter(c => !(c.type === "text" && isWsOnly(c.value)));
+            node.children.forEach(strip);
+        }
+    };
+    strip(root);
+    return minifyNode(root);
+}
+function minifyNode(node) {
+    if (node.type === "root") return node.children.map(minifyNode).join("");
+    if (node.type === "comment" || node.type === "cdata" || node.type === "pi" || node.type === "doctype") return node.value;
+    if (node.type === "text") return node.value;
+    const open = "<" + node.name + attrsString(node.attrs) + (node.selfClosing ? "/>" : ">");
+    if (node.selfClosing || node.children.length === 0) return open + (node.selfClosing ? "" : "</" + node.name + ">");
+    return open + node.children.map(minifyNode).join("") + "</" + node.name + ">";
+}
+
 /* ---- 颜色 ---- */
 function hexToRgb(hex) {
     const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
@@ -947,6 +1449,53 @@ const TOOLS = [
                     btn("键名排序", () => run("排序", v => JSON.stringify(sortValue(v), null, 2))),
                     copyBtn(() => out.value)),
                 field("输出结果", out));
+        }
+    },
+    {
+        id: "yamlprops", cat: "parse", icon: "Y↔P", name: "YAML ⇄ Properties",
+        desc: "YAML 与 .properties 配置互转，支持嵌套、数组、注释",
+        render(body) {
+            const src = area("server:\n  port: 8080\n  host: localhost\ntags:\n  - lan\n  - share\nuser:\n  name: admin\n  roles:\n    - ADMIN\n    - MEMBER\n", 12);
+            const out = area("", 12);
+            out.readOnly = true;
+            const toProps = () => {
+                try { out.value = yamlToProperties(src.value); showToast("已转换为 Properties"); }
+                catch (error) { out.value = ""; showToast(`YAML 解析失败：${error.message}`, true); }
+            };
+            const toYaml = () => {
+                try { out.value = propertiesToYaml(src.value); showToast("已转换为 YAML"); }
+                catch (error) { out.value = ""; showToast(`Properties 解析失败：${error.message}`, true); }
+            };
+            const swap = () => { const temp = src.value; src.value = out.value; out.value = temp; };
+            body.append(field("输入 YAML 或 Properties", src),
+                el("div", {class: "tool-actions"},
+                    btn("→ Properties", toProps, true),
+                    btn("→ YAML", toYaml),
+                    btn("⇄ 互换", swap),
+                    copyBtn(() => out.value)),
+                field("输出结果", out),
+                note("嵌套键(a.b.c)、数组(list[0])、行内注释与 #/! 注释均支持；属性值换行用 \\n，续行用行尾反斜杠。"));
+        }
+    },
+    {
+        id: "xmlfmt", cat: "parse", icon: "</>", name: "XML 格式化",
+        desc: "格式化、压缩、校验 XML，保留注释与 CDATA",
+        render(body) {
+            const src = area('<?xml version="1.0" encoding="UTF-8"?>\n<server>\n<name>seeker-share</name><port>8080</port><note>Hello <b>world</b></note>\n</server>', 8);
+            const out = area("", 10);
+            out.readOnly = true;
+            const run = (label, fn) => {
+                try { out.value = fn(src.value); showToast(label + "成功"); }
+                catch (error) { out.value = ""; showToast(`XML 解析失败：${error.message}`, true); }
+            };
+            body.append(field("输入 XML", src),
+                el("div", {class: "tool-actions"},
+                    btn("格式化 2 空格", () => run("格式化", v => formatXml(v, "  ")), true),
+                    btn("格式化 4 空格", () => run("格式化", v => formatXml(v, "    "))),
+                    btn("压缩", () => run("压缩", v => minifyXml(v))),
+                    copyBtn(() => out.value)),
+                field("输出结果", out),
+                note("自动校验标签闭合与匹配；保留注释 / CDATA / 处理指令，混排文本保持一行。"));
         }
     },
     {

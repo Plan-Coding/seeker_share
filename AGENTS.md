@@ -11,7 +11,7 @@ Seeker Share:基于 H2 的局域网消息/文件共享节点,内置纯前端"运
 ## 技术栈
 
 - 后端:Java 25 · Spring Boot 4.1.1 · Spring Web MVC · Spring Security · Spring Data JPA/Hibernate · H2 · Jakarta Validation · SSE · Actuator
-- 前端:Thymeleaf + 原生 JS/CSS3(工具箱**零第三方依赖**)
+- 前端:Thymeleaf + 原生 JS/CSS3(工具箱不加载外部网络依赖,需要时本地 vendor)
 - 构建:Maven Wrapper(`./mvnw`),不要用系统 mvn
 
 ## 目录结构
@@ -33,11 +33,12 @@ docs/             # 文档与截图
 
 ## 关键约束
 
-- 工具箱新工具:以对象注册进 `TOOLS` 数组(`id`/`cat`/`icon`/`name`/`desc`/`render(body)`),哈希路由直达 `#/tools/<id>`;**必须纯前端、零第三方依赖、数据不出本机**。
+- 工具箱新工具:以对象注册进 `TOOLS` 数组(`id`/`cat`/`icon`/`name`/`desc`/`render(body)`),哈希路由直达 `#/tools/<id>`;**必须纯前端、数据不出本机、不从外部网络/CDN 加载任何依赖**;确需第三方库时,下载到 `static/vendor/` 本地引入并保留许可证。
 - 新增分类:先扩展 `CATEGORIES`,再添加对应 `cat` 的工具;同步更新 README 中的工具数量。
 - `hanzi-data.js` 由脚本从公开数据集生成(压缩编码),**不要手改数据内容**;来源与许可见文件头注释。
 - 后端:控制器薄、服务厚;所有写操作走权限校验;异常统一交给 `GlobalExceptionHandler`。
 - 界面语言与文案使用简体中文。
+- **服务与测试**:未收到用户的明确测试指令,不得擅自启动/重启服务或进行运行时测试;代码改动后仅需完成静态检查与单元测试(`./mvnw test`、`node --check`),确认编译无问题后,应**通知用户自行启动并测试**,并说明测试入口/预期行为。
 
 ## 技能(Skills)
 
@@ -72,9 +73,9 @@ node --check src/main/resources/static/js/hanzi-data.js      # 数据文件语�
 - [ ] 前端改动 `node --check` 通过;新工具路由可直达、无 JS 报错(建议无头浏览器冒烟)
 - [ ] 涉及数据文件时核对来源与许可注释
 - [ ] README / 文档与功能一致(工具数量、目录结构、配置项)
-- [ ] 未引入第三方前端依赖
+- [ ] 未从外部网络/CDN 加载依赖(第三方库已下载到 `static/vendor/` 本地引入并保留许可证)
 
-## 提交规范
+## _提交规范_
 
 - Conventional Commits:`feat:` / `fix:` / `docs:` / `refactor:` / `test:` 等
 - 提交信息用中文或英文均可,需简要说明改动与验证结果

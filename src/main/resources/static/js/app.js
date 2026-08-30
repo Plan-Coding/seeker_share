@@ -591,7 +591,9 @@ function renderAuth() {
     account.classList.toggle("authenticated", authenticated);
     account.querySelector("span").textContent = authenticated ? `${state.auth.username} · 退出` : "登录";
     $("#adminNav").hidden = !authenticated || !hasAnyPermission("USER_MANAGE", "ROLE_MANAGE");
-    $("#docsNav").hidden = !authenticated || !hasPermission("DOCUMENT_READ");
+    // 文档库导航仅在其自身页面显示(按路由控制)
+    const onDocs = location.hash.startsWith("#/docs");
+    $("#docsNav").hidden = !onDocs || !authenticated || !hasPermission("DOCUMENT_READ");
     if (!authenticated) {
         $("#connectionText").textContent = "等待登录";
         $(".connection").classList.remove("connected");
