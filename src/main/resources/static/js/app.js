@@ -4,6 +4,7 @@ const state = {
     protectedLoaded: false, address: window.location.origin,
     admin: {users: [], roles: [], permissions: [], loaded: false}
 };
+const selectedUserIds = new Set();
 const $ = (selector) => document.querySelector(selector);
 const messageForm = $("#messageForm");
 const messageInput = $("#messageInput");
@@ -557,6 +558,7 @@ async function loadAdminData(force = false) {
 }
 
 function renderAdmin() {
+    selectedUserIds.clear();
     $("#adminUserCount").textContent = state.admin.users.length;
     $("#adminRoleCount").textContent = state.admin.roles.length;
     $("#adminPermissionCount").textContent = state.admin.permissions.length;
@@ -564,6 +566,7 @@ function renderAdmin() {
     renderNewRolePermissions();
     renderAdminUsers();
     renderAdminRoles();
+    updateBatchSelection();
 }
 
 function renderNewUserRoles() {
@@ -590,6 +593,15 @@ function createAdminUser(user) {
     const card = document.createElement("article");
     card.className = "admin-user";
     card.dataset.userId = user.id;
+
+    const select = document.createElement("input");
+    select.type = "checkbox";
+    select.className = "user-select";
+    select.value = user.id;
+    select.checked = selectedUserIds.has(user.id);
+    select.disabled = current;
+    if (current) select.title = "当前账户不可删除";
+    card.append(select);
 
     const identity = document.createElement("div");
     identity.className = "admin-user-identity";
@@ -722,7 +734,57 @@ function formatAdminDate(value) {
 }
 
 $("#refreshAdmin").addEventListener("click", () => loadAdminData(true));
-$("#adminUserSearch").addEventListener("input", renderAdminUsers);
+$("#adminUserSearch").addEventListener("input", () => { renderAdminUsers(); updateBatchSelection(); });
+
+function updateBatchSelection() {
+    const checkboxes = [...document.querySelectorAll("#adminUserList .user-select:not(:disabled)")];
+    const selectedCount = checkboxes.filter(cb => cb.checked).length;
+    const selectAll = $("#adminSelectAll");
+    selectAll.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
+    selectAll.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
+    $("#adminBatchDelete").disabled = selectedUserIds.size === 0;
+    const label = $("#adminSelectedCount");
+    label.textContent = `已选 ${selectedUserIds.size} 个用户`;
+    label.hidden = selectedUserIds.size === 0;
+}
+
+$("#adminUserList").addEventListener("change", event => {
+    const checkbox = event.target.closest(".user-select");
+    if (!checkbox) return;
+    if (checkbox.checked) selectedUserIds.add(checkbox.value);
+    else selectedUserIds.delete(checkbox.value);
+    updateBatchSelection();
+});
+
+$("#adminSelectAll").addEventListener("change", event => {
+    const select = event.currentTarget.checked;
+    document.querySelectorAll("#adminUserList .user-select:not(:disabled)").forEach(cb => {
+        cb.checked = select;
+        if (select) selectedUserIds.add(cb.value);
+        else selectedUserIds.delete(cb.value);
+    });
+    updateBatchSelection();
+});
+
+$("#adminBatchDelete").addEventListener("click", async () => {
+    if (selectedUserIds.size === 0) return;
+    const names = state.admin.users
+        .filter(user => selectedUserIds.has(user.id))
+        .map(user => user.username).join("、");
+    if (!window.confirm(`确定删除选中的 ${selectedUserIds.size} 个用户？\n${names}\n该操作不可恢复。`)) return;
+    const button = $("#adminBatchDelete");
+    button.disabled = true;
+    try {
+        const response = await request("/api/v1/admin/users", {
+            method: "DELETE", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ids: [...selectedUserIds]})
+        });
+        selectedUserIds.clear();
+        showToast(`已删除 ${response.data.deleted} 个用户`);
+        await loadAdminData(true);
+    } catch (error) { showToast(error.message, true); }
+    finally { updateBatchSelection(); }
+});
 
 $("#createUserForm").addEventListener("submit", async event => {
     event.preventDefault();

@@ -1,5 +1,6 @@
 package com.seeker.share.security;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -144,6 +145,51 @@ class AdminAccountManagementTests {
 				.contentType(MediaType.APPLICATION_JSON).content("{\"enabled\":false,\"unlock\":false}"))
 				.andExpect(status().isOk());
 		mvc.perform(get("/api/v1/shares").with(activeUser)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void deletesUsersInBatchButProtectsSelfAndBuiltInAdmin() throws Exception {
+		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{\"username\":\"batch.a\",\"initialPassword\":\"Batch-A#2026\",\"roles\":[\"MEMBER\"]}
+						"""))
+				.andExpect(status().isOk());
+		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+						{\"username\":\"batch.b\",\"initialPassword\":\"Batch-B#2026\",\"roles\":[\"MEMBER\"]}
+						"""))
+				.andExpect(status().isOk());
+		UUID a = users.findByUsernameIgnoreCase("batch.a").orElseThrow().getId();
+		UUID b = users.findByUsernameIgnoreCase("batch.b").orElseThrow().getId();
+
+		mvc.perform(delete("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"ids\":[\"%s\",\"%s\"]}".formatted(a, b)))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.data.deleted").value(2));
+		assertTrue(users.findByUsernameIgnoreCase("batch.a").isEmpty());
+		assertTrue(users.findByUsernameIgnoreCase("batch.b").isEmpty());
+
+		UUID adminId = users.findByUsernameIgnoreCase("admin").orElseThrow().getId();
+		mvc.perform(delete("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"ids\":[\"%s\"]}".formatted(adminId)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("不能删除当前登录账户"));
+
+		mvc.perform(delete("/api/v1/admin/users").with(userManager()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"ids\":[\"%s\"]}".formatted(adminId)))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("内置管理员账户不可删除"));
+
+		mvc.perform(delete("/api/v1/admin/users").with(admin()).with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"ids\":[]}"))
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.detail").value("请选择要删除的用户"));
 	}
 
 	private RequestPostProcessor admin() {

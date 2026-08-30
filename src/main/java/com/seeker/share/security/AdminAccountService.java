@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -23,14 +24,17 @@ public class AdminAccountService {
 	private final PermissionRepository permissions;
 	private final PasswordEncoder passwordEncoder;
 	private final PasswordPolicy passwordPolicy;
+	private final String builtInAdminUsername;
 
 	public AdminAccountService(AppUserRepository users, RoleRepository roles, PermissionRepository permissions,
-			PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy) {
+			PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy,
+			@Value("${seeker.security.admin-username}") String builtInAdminUsername) {
 		this.users = users;
 		this.roles = roles;
 		this.permissions = permissions;
 		this.passwordEncoder = passwordEncoder;
 		this.passwordPolicy = passwordPolicy;
+		this.builtInAdminUsername = builtInAdminUsername.strip();
 	}
 
 	@Transactional(readOnly = true)
@@ -100,6 +104,25 @@ public class AdminAccountService {
 		return permissions.findAll().stream()
 				.map(value -> new PermissionSummary(value.getCode().name(), value.getDescription()))
 				.sorted(Comparator.comparing(PermissionSummary::code)).toList();
+	}
+
+	@Transactional
+	public DeleteUsersResult deleteUsers(Set<UUID> ids, UUID operatorId) {
+		if (ids == null || ids.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "请选择要删除的用户");
+		}
+		if (ids.contains(operatorId)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "不能删除当前登录账户");
+		}
+		List<AppUser> targets = users.findAllById(ids);
+		if (targets.isEmpty()) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "用户不存在");
+		}
+		if (targets.stream().anyMatch(user -> user.getUsername().equalsIgnoreCase(builtInAdminUsername))) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "内置管理员账户不可删除");
+		}
+		users.deleteAll(targets);
+		return new DeleteUsersResult(targets.size());
 	}
 
 	@Transactional
@@ -176,4 +199,6 @@ public class AdminAccountService {
 	}
 
 	public record PermissionSummary(String code, String description) { }
+
+	public record DeleteUsersResult(int deleted) { }
 }

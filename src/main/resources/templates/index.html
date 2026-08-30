@@ -204,7 +204,13 @@
                     <button class="beam-button" type="submit"><span>创建用户</span><i>＋</i></button>
                 </form>
                 <div class="admin-list-panel glass">
-                    <div class="admin-list-tools"><label><span>⌕</span><input id="adminUserSearch" type="search" placeholder="搜索用户名或角色"></label></div>
+                    <div class="admin-list-tools"><label><span>⌕</span><input id="adminUserSearch" type="search" placeholder="搜索用户名或角色"></label>
+                        <div class="admin-batch-tools">
+                            <label class="admin-check select-all"><input id="adminSelectAll" type="checkbox"><span><strong>全选</strong></span></label>
+                            <button id="adminBatchDelete" class="admin-button danger" type="button" disabled>批量删除</button>
+                            <span id="adminSelectedCount" class="admin-selected-count" hidden></span>
+                        </div>
+                    </div>
                     <div id="adminUserList" class="admin-user-list" aria-live="polite"></div>
                 </div>
             </div>

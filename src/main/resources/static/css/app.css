@@ -279,8 +279,15 @@ footer strong { color: #7c8791; }
 .admin-list-tools label { display: flex; align-items: center; gap: .5rem; padding: 0 .8rem; border: 1px solid var(--line); background: rgba(0,0,0,.2); }
 .admin-list-tools label span { color: var(--lime); }
 .admin-list-tools input { width: 100%; padding: .7rem 0; border: 0; outline: 0; background: transparent; color: var(--text); }
+.admin-batch-tools { display: flex; align-items: center; gap: .5rem; margin-top: .6rem; flex-wrap: wrap; }
+.admin-batch-tools .select-all { display: inline-flex; padding: .35rem .6rem; border: 1px solid var(--line); background: rgba(255,255,255,.025); cursor: pointer; }
+.admin-batch-tools .select-all input { width: 14px; padding: 0; accent-color: var(--lime); }
+.admin-batch-tools .select-all strong { color: #99a4ad; font-size: .6rem; font-weight: 600; }
+.admin-selected-count { color: var(--lime); font: .56rem/1 ui-monospace,monospace; }
 .admin-user-list,.admin-role-list { display: grid; gap: .55rem; }
-.admin-user { display: grid; grid-template-columns: minmax(180px,1fr) minmax(150px,.8fr) auto; align-items: center; gap: .75rem; padding: .9rem; border: 1px solid var(--line); background: rgba(4,7,10,.45); }
+.admin-user { display: grid; grid-template-columns: minmax(20px,auto) minmax(180px,1fr) minmax(150px,.8fr) auto; align-items: center; gap: .75rem; padding: .9rem; border: 1px solid var(--line); background: rgba(4,7,10,.45); }
+.admin-user > .user-select { width: 14px; height: 14px; accent-color: var(--lime); cursor: pointer; }
+.admin-user > .user-select:disabled { cursor: not-allowed; opacity: .3; }
 .admin-user-identity > div { display: flex; align-items: center; gap: .5rem; }
 .admin-user-identity strong { font-size: .78rem; }
 .admin-user-identity small { display: block; margin-top: .3rem; color: #5f6b75; font-size: .54rem; }

@@ -36,6 +36,13 @@ public class AdminAccountController {
 	@GetMapping("/users")
 	public ApiResponse<List<UserSummary>> users() { return ApiResponse.ok(accounts.users()); }
 
+	@DeleteMapping("/users")
+	public ApiResponse<AdminAccountService.DeleteUsersResult> deleteUsers(@Valid @RequestBody DeleteUsersRequest body,
+			Authentication authentication) {
+		UserPrincipal operator = (UserPrincipal) authentication.getPrincipal();
+		return ApiResponse.ok(accounts.deleteUsers(body.ids(), operator.id()));
+	}
+
 	@PostMapping("/users")
 	public ApiResponse<UserSummary> createUser(@Valid @RequestBody CreateUserRequest body, Authentication authentication) {
 		boolean canManageRoles = authentication.getAuthorities().stream()
@@ -93,6 +100,10 @@ public class AdminAccountController {
 		public CreateUserRequest {
 			username = username == null ? null : username.strip();
 		}
+	}
+
+	public record DeleteUsersRequest(Set<UUID> ids) {
+		public DeleteUsersRequest { ids = ids == null ? Set.of() : Set.copyOf(ids); }
 	}
 
 	public record UserStatusRequest(Boolean enabled, boolean unlock) { }
