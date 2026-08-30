@@ -5,7 +5,7 @@
 /* --- 顶栏导航 --- */
 .topbar { grid-template-columns: auto auto 1fr auto auto; }
 .main-nav { display: flex; gap: .3rem; align-self: center; }
-.main-nav a { padding: .5rem .9rem; border: 1px solid transparent; color: #aeb8c2; font: 700 .66rem/1 ui-monospace, monospace; letter-spacing: .12em; text-decoration: none; transition: .2s; }
+.main-nav a { padding: .5rem .9rem; border: 1px solid transparent; color: #c3ccd4; font: 700 .66rem/1 ui-monospace, monospace; letter-spacing: .12em; text-decoration: none; transition: .2s; }
 .main-nav a:hover { color: var(--lime); }
 .main-nav a.active { border-color: var(--line-hot); background: rgba(183,255,60,.07); color: var(--lime); box-shadow: 0 0 18px rgba(183,255,60,.1); }
 .telemetry { justify-self: end; }
@@ -51,7 +51,7 @@
 .tools-main { min-width: 0; }
 .tool-panel { padding: 1.6rem; border-radius: 18px; }
 .tool-head { position: relative; }
-.tool-back { display: inline-block; margin-bottom: .9rem; color: #8c97a1; font: 600 .62rem/1 ui-monospace, monospace; letter-spacing: .1em; text-decoration: none; }
+.tool-back { display: inline-block; margin-bottom: .9rem; color: #aab5bf; font: 600 .62rem/1 ui-monospace, monospace; letter-spacing: .1em; text-decoration: none; }
 .tool-back:hover { color: var(--lime); }
 .tool-index { position: absolute; top: 0; right: 0; color: rgba(66,232,255,.4); font: .55rem/1.6 ui-monospace, monospace; letter-spacing: .14em; text-align: right; }
 .tool-head h2 { margin: .2rem 0 .45rem; font-size: 1.25rem; letter-spacing: -.01em; }
@@ -139,7 +139,7 @@ select.tool-input { cursor: pointer; }
 .tool-details summary { padding: .7rem .9rem; color: #d3dae1; font: 700 .64rem/1 ui-monospace, monospace; letter-spacing: .12em; cursor: pointer; user-select: none; }
 .tool-details summary:hover { color: var(--lime); }
 .tool-details[open] summary { border-bottom: 1px solid rgba(255,255,255,.06); color: var(--lime); }
-.tool-details .details-body { padding: .9rem; color: #b7c1ca; font-size: .7rem; line-height: 1.8; }
+.tool-details .details-body { padding: .9rem; color: #c3ccd4; font-size: .7rem; line-height: 1.8; }
 .tool-details .details-body code { color: var(--cyan); font: .68rem/1.6 ui-monospace, monospace; }
 .tool-details table { margin-top: .5rem; }
 
