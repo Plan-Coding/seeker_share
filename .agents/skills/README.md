@@ -2,7 +2,7 @@
 
 本目录存放本项目可复用的 **Agent Skills**(技能包),按 [Agent Skills 规范](https://agentskills.io/specification) 组织,遵循**渐进式披露**:仅技能描述常驻上下文,完整指令按需加载。项目级技能统一存放在 `.agents/skills/`(行业通用约定)。
 
-> **当前已安装技能:3 个**(`frontend/toolbox-tool`、`backend/api-endpoint`、`meta/issue-workflow`)。
+> **当前已安装技能:4 个**(`frontend/toolbox-tool`、`backend/api-endpoint`、`meta/issue-workflow`、`meta/commit-release`)。
 > 每次新增技能后,请同步更新本文件技能清单与对应分类的 README。
 
 ## 分层结构(层层递进)
@@ -23,6 +23,7 @@
 | [toolbox-tool](frontend/toolbox-tool/SKILL.md) | frontend | 新增/修改纯前端工具箱工具(TOOLS 注册、CSS、验证) |
 | [api-endpoint](backend/api-endpoint/SKILL.md) | backend | 新增受权限保护的后端 REST API(含测试) |
 | [issue-workflow](meta/issue-workflow/SKILL.md) | meta | Issue 驱动流程:分析 → 修复 → 验证 → 提交 |
+| [commit-release](meta/commit-release/SKILL.md) | meta | 提交/发布流程:新功能确认版本与分支、合入 main 后打 tag |
 
 ## 如何新增一个技能
 

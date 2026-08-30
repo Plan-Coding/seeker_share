@@ -78,4 +78,6 @@ node --check src/main/resources/static/js/hanzi-data.js      # 数据文件语�
 
 - Conventional Commits:`feat:` / `fix:` / `docs:` / `refactor:` / `test:` 等
 - 提交信息用中文或英文均可,需简要说明改动与验证结果
-- 使用 `git add -A` 后提交,并推送到 `origin/main`
+- **新功能**先按 `meta/commit-release` 技能与用户确认版本与分支(默认新开 `feature/` 分支、建议 MINOR+1),确认后才执行;修复/文档类走当前版本不再追问
+- 版本号从 `0.0.1` 累积,记录于 `pom.xml`(无 `-SNAPSHOT`)与 tag `vX.Y.Z`;合入 main 后打 tag
+- 使用 `git add -A` 后提交,并推送到 `origin/main`(含 tag 时用 `--tags`)
