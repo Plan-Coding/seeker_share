@@ -7,7 +7,9 @@
     <meta name="description" content="Seeker Share 局域网文件与消息共享">
     <title th:text="${applicationName}">Seeker Share</title>
     <link rel="stylesheet" th:href="@{/css/app.css}" href="/css/app.css">
+    <link rel="stylesheet" th:href="@{/css/tools.css}" href="/css/tools.css">
     <script th:src="@{/js/app.js}" src="/js/app.js" defer></script>
+    <script th:src="@{/js/tools.js}" src="/js/tools.js" defer></script>
 </head>
 <body>
 <div id="bootScreen" class="boot-screen" aria-hidden="true">
@@ -24,14 +26,19 @@
 
 <main class="shell">
     <header class="topbar glass">
-        <a class="brand" href="/" aria-label="Seeker Share 首页">
+        <a class="brand" href="#/share" aria-label="Seeker Share 首页">
             <span class="brand-mark">S</span>
             <span><strong th:text="${applicationName}">Seeker Share</strong><small>LOCAL TRANSMISSION NODE</small></span>
         </a>
+        <nav class="main-nav" aria-label="主功能导航">
+            <a href="#/share" data-nav="share" class="active">共享广场</a>
+            <a href="#/tools" data-nav="tools">工具箱</a>
+        </nav>
         <div class="telemetry" aria-hidden="true"><span>UPLINK / <b>LOCAL</b></span><span id="systemClock">00:00:00</span></div>
         <div class="connection"><span id="connectionDot"></span><strong id="connectionText">正在连接</strong><small>REALTIME SSE</small></div>
     </header>
 
+    <div id="viewShare" class="view">
     <section class="hero">
         <div class="hero-copy">
             <span class="kicker"><i></i> PRIVATE · FAST · DATABASE FREE</span>
@@ -100,6 +107,17 @@
             </div>
         </section>
     </section>
+    </div>
+
+    <div id="viewTools" class="view" hidden>
+        <div class="tools-layout">
+            <aside class="tools-side glass">
+                <label class="tools-search"><span>⌕</span><input id="toolsSearch" type="search" placeholder="搜索工具…"></label>
+                <div id="toolsMenu" class="tools-menu" aria-label="工具列表"></div>
+            </aside>
+            <section class="tools-main" id="toolsBody"></section>
+        </div>
+    </div>
 
     <footer><span>SEEKER SHARE / LOCAL ONLY</span><span>内容将在 <strong>24 小时</strong>后自动销毁</span></footer>
 </main>

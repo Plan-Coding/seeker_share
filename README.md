@@ -1,10 +1,12 @@
 # Seeker Share
 
-> 一个轻量、炫酷、无需数据库的局域网消息与文件共享节点。
+> 一个轻量、炫酷、无需数据库的局域网消息与文件共享节点，内置 23 个纯前端运维小工具。
 
-Seeker Share 用于在同一局域网内快速传递文字、链接、代码片段和文件。项目采用单机部署，数据不会经过第三方云服务，也不需要注册账号。
+Seeker Share 用于在同一局域网内快速传递文字、链接、代码片段和文件。项目采用单机部署，数据不会经过第三方云服务，也不需要注册账号。页面内置导航，可在「共享广场」与「工具箱」之间切换。
 
 ## 核心能力
+
+### 共享广场
 
 - 局域网内共享文字、链接和代码片段
 - 一键复制消息，支持单条删除与全部清空
@@ -18,6 +20,21 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 - 可通过管理员口令保护删除操作
 - 无数据库依赖：消息保存在内存，文件保存在本机目录
 - 响应式赛博终端界面，适配桌面端和移动端
+
+### 运维工具箱
+
+顶部导航切换到「工具箱」，23 个常用小工具**全部在浏览器本地运行，零后端依赖，数据不出本机**：
+
+| 分类 | 工具 |
+| --- | --- |
+| 文本处理 | 命名风格转换（camelCase / snake_case / kebab-case 等 9 种）、行处理（排序、去重、打乱等）、文本统计、文本对比（LCS 行级 diff）、摩斯电码 |
+| 编码转换 | Base64（UTF-8 安全）、URL 编解码、HTML 实体、Unicode 转义、进制转换（BigInt 大数，2~36 进制）、JWT 解码 |
+| 安全加密 | 哈希计算（MD5 / SHA-1 / SHA-256 / CRC32，纯 JS 实现，HTTP 环境可用）、密码生成器（熵估算）、UUID v4 |
+| 解析校验 | JSON 格式化 / 压缩 / 键名排序、正则测试器（实时高亮、捕获分组、速查表）、Cron 解析器（5/6 位表达式、中文释义、推算未来执行时间）、时间戳转换、URL 解析 |
+| 网络运维 | IP 子网计算器（CIDR：网络地址、掩码、广播、可用主机）、HTTP 状态码速查 |
+| 实用杂项 | 颜色转换（HEX / RGB / HSL）、Lorem 假文生成 |
+
+工具箱支持哈希路由直达，例如 `#/tools/cron`、`#/tools/regex`，可直接分享或收藏具体工具链接；侧边栏提供分类菜单与关键词搜索。
 
 ## AI Coding 声明
 
@@ -41,6 +58,7 @@ Seeker Share 用于在同一局域网内快速传递文字、链接、代码片�
 - Jakarta Validation
 - Server-Sent Events（SSE）
 - Spring Boot Actuator
+- 原生 JavaScript / CSS3（工具箱零第三方依赖）
 - Maven Wrapper
 
 ## 快速开始
@@ -55,7 +73,8 @@ cd seeker_share
 
 启动后访问：
 
-- 首页：<http://localhost:8080/>
+- 首页（共享广场）：<http://localhost:8080/>
+- 运维工具箱：<http://localhost:8080/#/tools>
 - 共享 API：<http://localhost:8080/api/v1/shares>
 - 健康检查：<http://localhost:8080/actuator/health>
 
@@ -104,7 +123,9 @@ src/main/java/com/seeker/share/
 ├── share/        # 分享模型、存储、清理和实时事件服务
 └── web/          # 页面与 REST 控制器
 src/main/resources/
-├── static/       # CSS 和 JavaScript 静态资源
+├── static/
+│   ├── css/      # app.css 共享界面 · tools.css 工具箱界面
+│   └── js/       # app.js 共享逻辑 · tools.js 工具箱（纯前端）
 └── templates/    # Thymeleaf 页面模板
 ```
 
