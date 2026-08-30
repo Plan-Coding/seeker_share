@@ -41,7 +41,7 @@ docs/             # 文档与截图
 
 ## 技能(Skills)
 
-项目技能存放在 **`.agents/skills/`**(pi 标准项目技能目录,自动发现)。
+项目技能存放在 **`.agents/skills/`**(Agent Skills 规范的项目级技能目录)。
 
 采用**层层递进**组织,各层只写必要内容、上层索引下层,避免单文件堆砌:
 
@@ -54,7 +54,7 @@ docs/             # 文档与截图
 ```
 
 - 技能主体为 `SKILL.md`(frontmatter `name`+`description`),深层细节放其 `references/`(L3)。
-- 使用:`/skill:<name>`;完整规则见 `.agents/skills/README.md`。
+- AI 代理根据技能描述按需加载执行;完整规则见 `.agents/skills/README.md`。
 - 新增技能后须同步 `.agents/skills/README.md` 技能清单与分类 README。
 
 ## 常用命令
