@@ -41,7 +41,8 @@ public class SecurityConfig {
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers("/", "/css/**", "/js/**", "/favicon.ico", "/error").permitAll()
 						.requestMatchers("/api/v1/auth/me", "/api/v1/auth/login",
-								"/api/v1/auth/change-password", "/api/v1/auth/logout",
+								"/api/v1/auth/prelogin",
+							"/api/v1/auth/change-password", "/api/v1/auth/logout",
 								"/api/v1/server", "/actuator/health", "/actuator/info").permitAll()
 						.requestMatchers(HttpMethod.GET, "/api/v1/shares/events", "/api/v1/shares").hasAuthority("SHARE_READ")
 						.requestMatchers(HttpMethod.GET, "/api/v1/shares/files/**").hasAuthority("SHARE_DOWNLOAD")

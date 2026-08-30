@@ -22,6 +22,82 @@ themeToggle.addEventListener("click", () => {
 });
 try { applyTheme(localStorage.getItem("seeker-theme") || "light"); }
 catch { applyTheme("light"); }
+
+/* ===== 登录凭据加密:与后端一致的加盐哈希 + RSA-OAEP ===== */
+const textEncoder = new TextEncoder();
+
+function bytesToHex(bytes) {
+    return [...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function base64ToBytes(base64) {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return bytes;
+}
+
+function bytesToBase64(bytes) {
+    let binary = "";
+    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+    return btoa(binary);
+}
+
+async function passwordDigest(password, salt) {
+    if (window.crypto?.subtle) {
+        const key = await crypto.subtle.importKey("raw", textEncoder.encode(salt),
+            {name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
+        const signature = await crypto.subtle.sign("HMAC", key, textEncoder.encode(password));
+        return bytesToHex(new Uint8Array(signature));
+    }
+    if (!window.forge) throw new Error("缺少加密组件，无法登录");
+    const hmac = window.forge.hmac.create();
+    hmac.start("sha256", window.forge.util.encodeUtf8(salt));
+    hmac.update(window.forge.util.encodeUtf8(password));
+    return hmac.digest().toHex();
+}
+
+async function encryptCredential(publicKeyBase64, plaintext) {
+    if (window.crypto?.subtle) {
+        const publicKey = await crypto.subtle.importKey("spki", base64ToBytes(publicKeyBase64),
+            {name: "RSA-OAEP", hash: "SHA-256"}, false, ["encrypt"]);
+        const encrypted = await crypto.subtle.encrypt({name: "RSA-OAEP"}, publicKey, textEncoder.encode(plaintext));
+        return bytesToBase64(new Uint8Array(encrypted));
+    }
+    if (!window.forge) throw new Error("缺少加密组件，无法登录");
+    const forge = window.forge;
+    const asn1 = forge.asn1.fromDer(forge.util.createBuffer(forge.util.decode64(publicKeyBase64)));
+    const publicKey = forge.pki.publicKeyFromAsn1(asn1);
+    const cipher = publicKey.encrypt(forge.util.encodeUtf8(plaintext), "RSA-OAEP", {md: forge.md.sha256.create()});
+    return forge.util.encode64(cipher);
+}
+
+async function buildCredential(password, challenge) {
+    const digest = await passwordDigest(password, challenge.salt);
+    return encryptCredential(challenge.publicKey, `${digest}:${challenge.nonce}`);
+}
+
+async function prelogin(username) {
+    const response = await request("/api/v1/auth/prelogin", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({username})
+    });
+    return response.data;
+}
+
+function validatePasswordPolicy(value, username) {
+    const errors = [];
+    if (value.length < 12) errors.push("至少 12 个字符");
+    if (value.length > 128) errors.push("不能超过 128 个字符");
+    if (!/[A-Z]/.test(value)) errors.push("包含大写字母");
+    if (!/[a-z]/.test(value)) errors.push("包含小写字母");
+    if (!/\d/.test(value)) errors.push("包含数字");
+    if (!/[^A-Za-z0-9\s]/.test(value)) errors.push("包含特殊字符");
+    if (/\s/.test(value)) errors.push("不能包含空白字符");
+    if (username && value.toLowerCase().includes(username.toLowerCase())) errors.push("不能包含用户名");
+    return errors;
+}
+
 const $ = (selector) => document.querySelector(selector);
 const messageForm = $("#messageForm");
 const messageInput = $("#messageInput");
@@ -43,9 +119,17 @@ loginForm.addEventListener("submit", async event => {
     const button = loginForm.querySelector("button[type=submit]");
     button.disabled = true;
     try {
+        const username = $("#loginUsername").value.trim();
+        const password = $("#loginPassword").value;
+        if (!username || !password) {
+            setAuthError("login", "请输入用户名和密码");
+            return;
+        }
+        const challenge = await prelogin(username);
+        const credential = await buildCredential(password, challenge);
         const response = await request("/api/v1/auth/login", {
             method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username: $("#loginUsername").value, password: $("#loginPassword").value})
+            body: JSON.stringify({username, credential})
         });
         applyAuth(response.data);
         $("#loginPassword").value = "";
@@ -63,13 +147,26 @@ passwordForm.addEventListener("submit", async event => {
     const button = passwordForm.querySelector("button[type=submit]");
     button.disabled = true;
     try {
+        const currentPassword = $("#currentPassword").value;
+        const newPassword = $("#newPassword").value;
+        const confirmation = $("#confirmPassword").value;
+        if (newPassword !== confirmation) {
+            setAuthError("password", "两次输入的新密码不一致");
+            return;
+        }
+        const policyErrors = validatePasswordPolicy(newPassword, state.auth?.username);
+        if (policyErrors.length) {
+            setAuthError("password", "密码强度不足：" + policyErrors.join("、"));
+            return;
+        }
+        const username = state.auth.username;
+        const challenge1 = await prelogin(username);
+        const currentCredential = await buildCredential(currentPassword, challenge1);
+        const challenge2 = await prelogin(username);
+        const newCredential = await buildCredential(newPassword, challenge2);
         const response = await request("/api/v1/auth/change-password", {
             method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({
-                currentPassword: $("#currentPassword").value,
-                newPassword: $("#newPassword").value,
-                confirmation: $("#confirmPassword").value
-            })
+            body: JSON.stringify({currentCredential, newCredential})
         });
         applyAuth(response.data);
         passwordForm.reset();
@@ -862,10 +959,18 @@ $("#createUserForm").addEventListener("submit", async event => {
             showToast("用户名只能包含字母、数字、点、横线和下划线，长度 3-50 位", true);
             return;
         }
+        const password = $("#adminNewPassword").value;
+        const policyErrors = validatePasswordPolicy(password, username);
+        if (policyErrors.length) {
+            showToast("密码强度不足：" + policyErrors.join("、"), true);
+            return;
+        }
         const roles = hasPermission("ROLE_MANAGE") ? checkedValues($("#newUserRoles")) : [];
+        const challenge = await prelogin(username);
+        const credential = await buildCredential(password, challenge);
         await request("/api/v1/admin/users", {
             method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({username, initialPassword: $("#adminNewPassword").value, roles})
+            body: JSON.stringify({username, credential, roles})
         });
         form.reset();
         showToast("用户已创建");
@@ -935,9 +1040,18 @@ $("#adminUserList").addEventListener("click", async event => {
 $("#resetPasswordForm").addEventListener("submit", async event => {
     event.preventDefault();
     try {
+        const user = state.admin.users.find(item => item.id === resetPasswordUserId);
+        const password = $("#resetPasswordValue").value;
+        const policyErrors = validatePasswordPolicy(password, user.username);
+        if (policyErrors.length) {
+            showToast("密码强度不足：" + policyErrors.join("、"), true);
+            return;
+        }
+        const challenge = await prelogin(user.username);
+        const credential = await buildCredential(password, challenge);
         await request(`/api/v1/admin/users/${resetPasswordUserId}/reset-password`, {
             method: "POST", headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({initialPassword: $("#resetPasswordValue").value})
+            body: JSON.stringify({credential})
         });
         $("#resetPasswordDialog").close();
         showToast("初始密码已重置");

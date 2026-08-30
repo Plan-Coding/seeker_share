@@ -19,17 +19,20 @@ class AccountLockTests {
 
 	@Autowired AuthService authService;
 	@Autowired AppUserRepository users;
+	@Autowired PasswordHashService passwordHashService;
 
 	@Test
 	void locksAccountAfterConfiguredFailedAttempts() {
-		assertThatThrownBy(() -> authService.login("admin", "wrong-one"))
+		AppUser admin = users.findByUsernameIgnoreCase("admin").orElseThrow();
+		String salt = admin.getPasswordSalt();
+		assertThatThrownBy(() -> authService.loginWithDigest("admin", passwordHashService.digest("wrong-one", salt)))
 				.isInstanceOf(BadCredentialsException.class);
-		assertThatThrownBy(() -> authService.login("admin", "wrong-two"))
+		assertThatThrownBy(() -> authService.loginWithDigest("admin", passwordHashService.digest("wrong-two", salt)))
 				.isInstanceOf(BadCredentialsException.class);
-		assertThatThrownBy(() -> authService.login("admin", "wrong-three"))
+		assertThatThrownBy(() -> authService.loginWithDigest("admin", passwordHashService.digest("wrong-three", salt)))
 				.isInstanceOf(LockedException.class);
 
-		AppUser admin = users.findByUsernameIgnoreCase("admin").orElseThrow();
+		admin = users.findByUsernameIgnoreCase("admin").orElseThrow();
 		assertThat(admin.isAccountNonLocked()).isFalse();
 		assertThat(admin.getFailedLoginAttempts()).isEqualTo(3);
 	}

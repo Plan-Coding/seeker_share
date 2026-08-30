@@ -10,7 +10,6 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -22,18 +21,16 @@ public class AdminAccountService {
 	private final AppUserRepository users;
 	private final RoleRepository roles;
 	private final PermissionRepository permissions;
-	private final PasswordEncoder passwordEncoder;
-	private final PasswordPolicy passwordPolicy;
+	private final PasswordHashService passwordHashService;
 	private final String builtInAdminUsername;
 
 	public AdminAccountService(AppUserRepository users, RoleRepository roles, PermissionRepository permissions,
-			PasswordEncoder passwordEncoder, PasswordPolicy passwordPolicy,
+			PasswordHashService passwordHashService,
 			@Value("${seeker.security.admin-username}") String builtInAdminUsername) {
 		this.users = users;
 		this.roles = roles;
 		this.permissions = permissions;
-		this.passwordEncoder = passwordEncoder;
-		this.passwordPolicy = passwordPolicy;
+		this.passwordHashService = passwordHashService;
 		this.builtInAdminUsername = builtInAdminUsername.strip();
 	}
 
@@ -44,17 +41,22 @@ public class AdminAccountService {
 	}
 
 	@Transactional
-	public UserSummary createUser(String username, String initialPassword, Set<String> roleNames, boolean canManageRoles) {
+	public UserSummary createUser(String username, String salt, String initialDigest, Set<String> roleNames, boolean canManageRoles) {
 		String normalized = username.strip().toLowerCase(Locale.ROOT);
 		if (users.existsByUsernameIgnoreCase(normalized)) {
 			throw new ResponseStatusException(HttpStatus.CONFLICT, "用户名已存在");
 		}
-		passwordPolicy.validate(initialPassword, normalized);
+		if (salt == null || !salt.matches("[0-9a-f]{32}")) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码盐格式不正确");
+		}
+		if (initialDigest == null || !initialDigest.matches("[0-9a-f]{64}")) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码凭据格式不正确");
+		}
 		Set<String> requestedRoles = normalizeRoleNames(roleNames == null || roleNames.isEmpty() ? Set.of("MEMBER") : roleNames);
 		if (!canManageRoles && !requestedRoles.equals(Set.of("MEMBER"))) {
 			throw new ResponseStatusException(HttpStatus.FORBIDDEN, "分配其他角色需要角色管理权限");
 		}
-		AppUser user = new AppUser(normalized, passwordEncoder.encode(initialPassword));
+		AppUser user = new AppUser(normalized, passwordHashService.encodeDigest(initialDigest), salt);
 		user.getRoles().addAll(resolveRoles(requestedRoles));
 		return UserSummary.from(users.save(user));
 	}
@@ -86,10 +88,12 @@ public class AdminAccountService {
 	}
 
 	@Transactional
-	public void resetPassword(UUID id, String initialPassword) {
+	public void resetPassword(UUID id, String initialDigest) {
 		AppUser user = requireUser(id);
-		passwordPolicy.validate(initialPassword, user.getUsername());
-		user.resetPassword(passwordEncoder.encode(initialPassword));
+		if (initialDigest == null || !initialDigest.matches("[0-9a-f]{64}")) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "密码凭据格式不正确");
+		}
+		user.resetPassword(passwordHashService.encodeDigest(initialDigest));
 		users.save(user);
 	}
 

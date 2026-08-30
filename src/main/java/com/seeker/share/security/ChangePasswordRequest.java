@@ -1,9 +1,7 @@
 package com.seeker.share.security;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 
 public record ChangePasswordRequest(
-		@NotBlank @Size(max = 128) String currentPassword,
-		@NotBlank @Size(max = 128) String newPassword,
-		@NotBlank @Size(max = 128) String confirmation) { }
+		@NotBlank(message = "当前密码不能为空") String currentCredential,
+		@NotBlank(message = "新密码不能为空") String newCredential) { }

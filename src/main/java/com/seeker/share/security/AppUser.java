@@ -30,6 +30,9 @@ public class AppUser {
 	@Column(name = "password_hash", nullable = false, length = 100)
 	private String passwordHash;
 
+	@Column(name = "password_salt", length = 32)
+	private String passwordSalt;
+
 	@Column(nullable = false)
 	private boolean enabled = true;
 
@@ -63,8 +66,13 @@ public class AppUser {
 	protected AppUser() { }
 
 	public AppUser(String username, String passwordHash) {
+		this(username, passwordHash, null);
+	}
+
+	public AppUser(String username, String passwordHash, String passwordSalt) {
 		this.username = username;
 		this.passwordHash = passwordHash;
+		this.passwordSalt = passwordSalt;
 	}
 
 	@PreUpdate
@@ -102,6 +110,8 @@ public class AppUser {
 	public UUID getId() { return id; }
 	public String getUsername() { return username; }
 	public String getPasswordHash() { return passwordHash; }
+	public String getPasswordSalt() { return passwordSalt; }
+	public void setPasswordSalt(String passwordSalt) { this.passwordSalt = passwordSalt; }
 	public boolean isEnabled() { return enabled; }
 	public boolean isAccountNonLocked() { return accountNonLocked; }
 	public boolean isPasswordChangeRequired() { return passwordChangeRequired; }

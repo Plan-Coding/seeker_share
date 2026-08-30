@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,7 +17,7 @@ public class SecurityDataInitializer implements ApplicationRunner {
 	private final PermissionRepository permissions;
 	private final RoleRepository roles;
 	private final AppUserRepository users;
-	private final PasswordEncoder passwordEncoder;
+	private final PasswordHashService passwordHashService;
 	private final String adminUsername;
 	private final String initialPassword;
 
@@ -26,13 +25,13 @@ public class SecurityDataInitializer implements ApplicationRunner {
 			PermissionRepository permissions,
 			RoleRepository roles,
 			AppUserRepository users,
-			PasswordEncoder passwordEncoder,
+			PasswordHashService passwordHashService,
 			@Value("${seeker.security.admin-username}") String adminUsername,
 			@Value("${seeker.security.admin-initial-password}") String initialPassword) {
 		this.permissions = permissions;
 		this.roles = roles;
 		this.users = users;
-		this.passwordEncoder = passwordEncoder;
+		this.passwordHashService = passwordHashService;
 		this.adminUsername = adminUsername.strip();
 		this.initialPassword = initialPassword;
 	}
@@ -61,10 +60,28 @@ public class SecurityDataInitializer implements ApplicationRunner {
 		roles.save(memberRole);
 
 		if (!users.existsByUsernameIgnoreCase(adminUsername)) {
-			AppUser admin = new AppUser(adminUsername, passwordEncoder.encode(initialPassword));
+			String salt = passwordHashService.newSalt();
+			AppUser admin = new AppUser(adminUsername, passwordHashService.encode(initialPassword, salt), salt);
 			admin.getRoles().add(adminRole);
 			users.save(admin);
 			log.warn("已初始化管理员账户 '{}'；首次登录必须修改初始密码", adminUsername);
+		}
+		migrateLegacyPasswordSalts();
+	}
+
+	private void migrateLegacyPasswordSalts() {
+		for (AppUser user : users.findAll()) {
+			if (user.getPasswordSalt() != null) continue;
+			String salt = passwordHashService.newSalt();
+			user.setPasswordSalt(salt);
+			if (user.getUsername().equalsIgnoreCase(adminUsername)) {
+				user.resetPassword(passwordHashService.encode(initialPassword, salt));
+				log.warn("内置管理员 '{}' 缺少密码盐,已重置为配置的初始密码", adminUsername);
+			} else {
+				user.resetPassword(passwordHashService.encodeDigest(passwordHashService.newSalt()));
+				log.warn("用户 '{}' 缺少密码盐,已作废旧密码,需管理员重置", user.getUsername());
+			}
+			users.save(user);
 		}
 	}
 

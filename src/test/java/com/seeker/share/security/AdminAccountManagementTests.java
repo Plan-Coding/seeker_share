@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Map;
 import java.util.UUID;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -33,6 +36,7 @@ class AdminAccountManagementTests {
 	@Autowired AppUserRepository users;
 	@Autowired RoleRepository roles;
 	@Autowired PermissionRepository permissions;
+	@Autowired ObjectMapper mapper;
 
 	@Test
 	void createsUsersAndAssignsCustomRolesButProtectsCurrentOperator() throws Exception {
@@ -45,9 +49,10 @@ class AdminAccountManagementTests {
 
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"username":"audit.user","initialPassword":"Audit-Start#2026","roles":["MEMBER"]}
-						"""))
+				.content(mapper.writeValueAsString(Map.of(
+						"username", "audit.user",
+						"credential", createUserCredential("audit.user", "Audit-Start#2026"),
+						"roles", java.util.List.of("MEMBER")))))
 				.andExpect(status().isOk())
 				.andExpect(jsonPath("$.data.roles[0]").value("MEMBER"));
 
@@ -77,9 +82,10 @@ class AdminAccountManagementTests {
 
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"username":"temp.user","initialPassword":"Temp-Start#2026","roles":["TEMP_DELETE"]}
-						"""))
+				.content(mapper.writeValueAsString(Map.of(
+						"username", "temp.user",
+						"credential", createUserCredential("temp.user", "Temp-Start#2026"),
+						"roles", java.util.List.of("TEMP_DELETE")))))
 				.andExpect(status().isOk());
 		UUID userId = users.findByUsernameIgnoreCase("temp.user").orElseThrow().getId();
 
@@ -100,9 +106,10 @@ class AdminAccountManagementTests {
 	void userManagerCannotAssignRolesWithoutRoleManagementPermission() throws Exception {
 		mvc.perform(post("/api/v1/admin/users").with(userManager()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"username":"forbidden.user","initialPassword":"Forbidden#2026","roles":["ADMIN"]}
-						"""))
+				.content(mapper.writeValueAsString(Map.of(
+						"username", "forbidden.user",
+						"credential", createUserCredential("forbidden.user", "Forbidden#2026"),
+						"roles", java.util.List.of("ADMIN")))))
 				.andExpect(status().isForbidden());
 	}
 
@@ -110,15 +117,15 @@ class AdminAccountManagementTests {
 	void createUserValidationErrorsReturnChineseProblemDetail() throws Exception {
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"username\":\"中文名\",\"initialPassword\":\"Weak#123\"}"))
+				.content("{\"username\":\"中文名\",\"credential\":\"x\"}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detail").value("用户名只能包含字母、数字、点、横线和下划线，长度 3-50 位"));
 
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("{\"username\":\"valid.name\",\"initialPassword\":\"Weak#123\"}"))
+				.content("{\"username\":\"valid.name\",\"credential\":\"bad\"}"))
 				.andExpect(status().isBadRequest())
-				.andExpect(jsonPath("$.detail").value("密码强度不足：至少 12 个字符"));
+				.andExpect(jsonPath("$.detail").value("登录凭据无效"));
 
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
@@ -131,9 +138,10 @@ class AdminAccountManagementTests {
 	void disablingAccountRevokesItsExistingAuthenticationImmediately() throws Exception {
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{"username":"active.user","initialPassword":"Active-Start#2026","roles":["MEMBER"]}
-						"""))
+				.content(mapper.writeValueAsString(Map.of(
+						"username", "active.user",
+						"credential", createUserCredential("active.user", "Active-Start#2026"),
+						"roles", java.util.List.of("MEMBER")))))
 				.andExpect(status().isOk());
 		AppUser user = users.findByUsernameIgnoreCase("active.user").orElseThrow();
 		user.changePassword(user.getPasswordHash());
@@ -151,15 +159,17 @@ class AdminAccountManagementTests {
 	void deletesUsersInBatchButProtectsSelfAndBuiltInAdmin() throws Exception {
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{\"username\":\"batch.a\",\"initialPassword\":\"Batch-A#2026\",\"roles\":[\"MEMBER\"]}
-						"""))
+				.content(mapper.writeValueAsString(Map.of(
+						"username", "batch.a",
+						"credential", createUserCredential("batch.a", "Batch-A#2026"),
+						"roles", java.util.List.of("MEMBER")))))
 				.andExpect(status().isOk());
 		mvc.perform(post("/api/v1/admin/users").with(admin()).with(csrf())
 				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{\"username\":\"batch.b\",\"initialPassword\":\"Batch-B#2026\",\"roles\":[\"MEMBER\"]}
-						"""))
+				.content(mapper.writeValueAsString(Map.of(
+						"username", "batch.b",
+						"credential", createUserCredential("batch.b", "Batch-B#2026"),
+						"roles", java.util.List.of("MEMBER")))))
 				.andExpect(status().isOk());
 		UUID a = users.findByUsernameIgnoreCase("batch.a").orElseThrow().getId();
 		UUID b = users.findByUsernameIgnoreCase("batch.b").orElseThrow().getId();
@@ -190,6 +200,20 @@ class AdminAccountManagementTests {
 				.content("{\"ids\":[]}"))
 				.andExpect(status().isBadRequest())
 				.andExpect(jsonPath("$.detail").value("请选择要删除的用户"));
+	}
+
+	private String createUserCredential(String username, String password) throws Exception {
+		var result = mvc.perform(post("/api/v1/auth/prelogin").with(csrf())
+				.contentType(MediaType.APPLICATION_JSON)
+				.content(mapper.writeValueAsString(Map.of("username", username))))
+				.andExpect(status().isOk())
+				.andReturn();
+		JsonNode data = mapper.readTree(result.getResponse().getContentAsString()).path("data");
+		return CredentialTestHelper.buildCredential(
+				data.path("publicKey").asText(),
+				data.path("salt").asText(),
+				data.path("nonce").asText(),
+				password);
 	}
 
 	private RequestPostProcessor admin() {
