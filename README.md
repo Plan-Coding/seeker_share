@@ -165,6 +165,7 @@ src/main/resources/
 │   └── js/       # app.js 共享逻辑 · tools.js 工具箱（纯前端）· hanzi-data.js 汉字拼音/笔画数据
 └── templates/    # Thymeleaf 页面模板
 AGENTS.md         # AI 代理项目指令（约定、命令、质量门槛）
+.agents/skills/   # Agent Skills 技能目录（分层组织，见其 README）
 docs/             # 文档与截图
 ```
 

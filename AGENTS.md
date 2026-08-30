@@ -39,6 +39,24 @@ docs/             # 文档与截图
 - 后端:控制器薄、服务厚;所有写操作走权限校验;异常统一交给 `GlobalExceptionHandler`。
 - 界面语言与文案使用简体中文。
 
+## 技能(Skills)
+
+项目技能存放在 **`.agents/skills/`**(pi 标准项目技能目录,自动发现)。
+
+采用**层层递进**组织,各层只写必要内容、上层索引下层,避免单文件堆砌:
+
+```text
+.agents/skills/
+├── README.md          # L0 总览:分层结构、技能清单、如何新增/使用
+├── frontend/          # L1 分类:前端(README + toolbox-tool 技能)
+├── backend/           # L1 分类:后端(README + api-endpoint 技能)
+└── meta/              # L1 分类:AI 协作(README + issue-workflow 技能)
+```
+
+- 技能主体为 `SKILL.md`(frontmatter `name`+`description`),深层细节放其 `references/`(L3)。
+- 使用:`/skill:<name>`;完整规则见 `.agents/skills/README.md`。
+- 新增技能后须同步 `.agents/skills/README.md` 技能清单与分类 README。
+
 ## 常用命令
 
 ```bash
