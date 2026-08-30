@@ -476,6 +476,7 @@ function renderAuth() {
     account.classList.toggle("authenticated", authenticated);
     account.querySelector("span").textContent = authenticated ? `${state.auth.username} · 退出` : "登录";
     $("#adminNav").hidden = !authenticated || !hasAnyPermission("USER_MANAGE", "ROLE_MANAGE");
+    $("#docsNav").hidden = !authenticated || !hasPermission("DOCUMENT_READ");
     if (!authenticated) {
         $("#connectionText").textContent = "等待登录";
         $(".connection").classList.remove("connected");
@@ -725,7 +726,8 @@ $("#adminUserSearch").addEventListener("input", renderAdminUsers);
 
 $("#createUserForm").addEventListener("submit", async event => {
     event.preventDefault();
-    const button = event.currentTarget.querySelector("button[type=submit]");
+    const form = event.currentTarget;
+    const button = form.querySelector("button[type=submit]");
     button.disabled = true;
     try {
         const usernameInput = $("#adminNewUsername");
@@ -739,7 +741,7 @@ $("#createUserForm").addEventListener("submit", async event => {
             method: "POST", headers: {"Content-Type": "application/json"},
             body: JSON.stringify({username, initialPassword: $("#adminNewPassword").value, roles})
         });
-        event.currentTarget.reset();
+        form.reset();
         showToast("用户已创建");
         await loadAdminData(true);
     } catch (error) { showToast(error.message, true); }
@@ -748,7 +750,8 @@ $("#createUserForm").addEventListener("submit", async event => {
 
 $("#createRoleForm").addEventListener("submit", async event => {
     event.preventDefault();
-    const button = event.currentTarget.querySelector("button[type=submit]");
+    const form = event.currentTarget;
+    const button = form.querySelector("button[type=submit]");
     button.disabled = true;
     try {
         await request("/api/v1/admin/roles", {
@@ -759,7 +762,7 @@ $("#createRoleForm").addEventListener("submit", async event => {
                 permissions: checkedValues($("#newRolePermissions"))
             })
         });
-        event.currentTarget.reset();
+        form.reset();
         showToast("角色已创建");
         await loadAdminData(true);
     } catch (error) { showToast(error.message, true); }
